@@ -1,0 +1,14 @@
+[package]
+name = "elementtree"
+version = "0.4.0"
+authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
+description = "Parse an XML file into Python elementtree like structure"
+documentation = "http://docs.rs/elementtree"
+repository = "https://github.com/mitsuhiko/elementtree-rs"
+keywords = ["xml", "parse", "elementtree"]
+license = "BSD-3-Clause"
+readme = "README.md"
+
+[dependencies]
+xml-rs = "0"
+string_cache = "0"

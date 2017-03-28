@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<foo xmlns="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:x="tag:foo">
+  <list x:bar="42" baz="23">
+    <item>Test 1</item>Tail1
+    <item>Test 2</item>Tail2
+  </list>
+  <list x:bar="42" baz="23">
+    <item>Test 3</item>Tail3
+    <item>Test 4</item>Tail4
+  </list>
+</foo>
