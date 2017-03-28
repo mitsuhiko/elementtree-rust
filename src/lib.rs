@@ -34,6 +34,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Iter as HashMapIter;
 use std::io::Read;
 use std::fmt;
+use std::mem;
 use std::ops::Deref;
 use std::hash::{Hash, Hasher};
 use std::borrow::Cow;
@@ -199,10 +200,10 @@ impl<'a> QName<'a> {
     /// Creates a shared `QName` with static lifetime from an already
     /// existing `QName`.  The internal strings are interned and might
     /// be shared with other instances.
-    pub fn share(self) -> QName<'static> {
+    pub fn share(&self) -> QName<'static> {
         QName {
             name: XmlAtom::Shared(Atom::from(self.name.borrow())),
-            ns: self.ns.map(|x| XmlAtom::Shared(Atom::from(x.borrow()))),
+            ns: self.ns.as_ref().map(|x| XmlAtom::Shared(Atom::from(x.borrow()))),
         }
     }
 
@@ -352,6 +353,17 @@ impl<'a> Iterator for FindChildren<'a> {
 }
 
 impl Element {
+    /// Creates a new element without any children but a given tag.
+    pub fn new<'a>(tag: &QName<'a>) -> Element {
+        Element {
+            tag: tag.share(),
+            attributes: HashMap::new(),
+            children: vec![],
+            text: None,
+            tail: None,
+        }
+    }
+
     /// Parses some data into an Element
     pub fn from_reader<R: Read>(r: R) -> Result<Element, Error> {
         let mut reader = EventReader::new(r);
@@ -366,7 +378,7 @@ impl Element {
                 Ok(XmlEvent::ProcessingInstruction { .. }) => {
                     continue;
                 }
-                Ok(evt) => return Err(Error::UnexpectedEvent),
+                Ok(_) => return Err(Error::UnexpectedEvent),
                 Err(e) => return Err(Error::MalformedXml(e)),
             }
         }
@@ -428,7 +440,7 @@ impl Element {
                 Ok(XmlEvent::ProcessingInstruction { .. }) => {
                     continue;
                 }
-                Ok(evt) => {
+                Ok(_) => {
                     return Err(Error::UnexpectedEvent);
                 }
                 Err(e) => {
@@ -443,14 +455,37 @@ impl Element {
         self.text.as_ref().map(|x| x.as_str()).unwrap_or("")
     }
 
+    /// Sets a new text value for the tag.
+    pub fn set_text(&mut self, value: &str) {
+        if value.is_empty() {
+            self.text = None;
+        } else {
+            self.text = Some(value.to_string());
+        }
+    }
+
     /// Returns the tail text of a tag
     pub fn tail(&self) -> &str {
         self.tail.as_ref().map(|x| x.as_str()).unwrap_or("")
     }
 
+    /// Sets a new tail text value for the tag.
+    pub fn set_tail(&mut self, value: &str) {
+        if value.is_empty() {
+            self.tail = None;
+        } else {
+            self.tail = Some(value.to_string());
+        }
+    }
+
     /// The tag of the element as qualified name
     pub fn tag(&self) -> &QName {
         &self.tag
+    }
+
+    /// Sets a new tag for the element.
+    pub fn set_tag<'a>(&mut self, tag: &QName<'a>) {
+        self.tag = tag.share();
     }
 
     /// Returns the number of children
@@ -461,6 +496,28 @@ impl Element {
     /// Returns the nth child.
     pub fn get_child(&self, idx: usize) -> Option<&Element> {
         self.children.get(idx)
+    }
+
+    /// Returns the nth child as a mutable reference.
+    pub fn get_child_mut(&mut self, idx: usize) -> Option<&mut Element> {
+        self.children.get_mut(idx)
+    }
+
+    /// Removes a child.
+    ///
+    /// This returns the element if it was removed or None if the
+    /// index was out of bounds.
+    pub fn remove_child(&mut self, idx: usize) -> Option<Element> {
+        if self.children.len() > idx {
+            Some(self.children.remove(idx))
+        } else {
+            None
+        }
+    }
+
+    /// Appends a new child
+    pub fn append_child(&mut self, child: Element) {
+        self.children.push(child);
     }
 
     /// Returns an iterator over all children.
@@ -496,6 +553,30 @@ impl Element {
     /// Look up an attribute by qualified name.
     pub fn get_attr<'a, Q: AsQName<'a>>(&'a self, name: Q) -> Option<&'a str> {
         self.attributes.get(&name.as_qname()).map(|x| x.as_str())
+    }
+
+    /// Sets a new attribute.
+    pub fn set_attr<'a, Q: AsQName<'a>, S: AsRef<str>>(&'a mut self, name: Q, value: S) {
+        self.attributes.insert(name.as_qname().share(), value.as_ref().to_string());
+    }
+
+    /// Removes an attribute and returns the stored string.
+    pub fn remove_attr<'a, Q: AsQName<'a>>(&'a mut self, name: Q) -> Option<String> {
+        // so this requires some explanation.  We store internally QName<'static>
+        // which means the QName has a global lifetime.  This works because we
+        // move the internal string storage into a global string cache or we are
+        // pointing to static memory in the binary.
+        //
+        // However while Rust can coerce our HashMap from QName<'static> to
+        // QName<'a> when reading, we can't do the same when writing.  This is
+        // to prevent us from stashing a QName<'a> into the hashmap.  However on
+        // remove that restriction makes no sense so we can unsafely transmute it
+        // away.  I wish there was a better way though.
+        use std::borrow::Borrow;
+        let name = name.as_qname();
+        let name_ref: &QName<'a> = name.borrow();
+        let name_ref_static: &QName<'static> = unsafe { mem::transmute(name_ref) };
+        self.attributes.remove(name_ref_static)
     }
 
     /// Returns an iterator over all attributes
