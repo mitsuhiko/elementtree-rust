@@ -1,6 +1,32 @@
 //! A simple library for parsing an XML file into an in-memory tree structure
 //!
 //! Not recommended for large XML files, as it will load the entire file into memory.
+//!
+//! ## Installation
+//!
+//! ```ini
+//! [dependencies]
+//! elementtree = "0"
+//! ```
+//!
+//! ## Usage
+//!
+//! ```rust
+//! use elementtree::Element;
+//! let root = Element::from_reader(r#"<?xml version="1.0"?>
+//! <root xmlns="tag:myns" xmlns:foo="tag:otherns">
+//!     <list a="1" b="2" c="3">
+//!         <item foo:attr="foo1"/>
+//!         <item foo:attr="foo2"/>
+//!         <item foo:attr="foo3"/>
+//!     </list>
+//! </root>
+//! "#.as_bytes()).unwrap();
+//! let list = root.find("{tag:myns}list").unwrap();
+//! for child in list.find_all("{tag:myns}item") {
+//!     println!("attribute: {}", child.get_attr("{tag:otherns}attr").unwrap());
+//! }
+//! ```
 extern crate xml;
 extern crate string_cache;
 
