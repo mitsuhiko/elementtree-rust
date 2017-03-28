@@ -101,6 +101,7 @@ impl<'a> AsQName<'a> for (&'a str, &'a str) {
 /// Common usage examples:
 ///
 /// ```no_run
+/// # use elementtree::QName;
 /// let href = QName::from_name("href");
 /// let a = QName::from("{http://www.w3.org/1999/xhtml}a");
 /// ```
@@ -116,7 +117,8 @@ impl<'a> QName<'a> {
     /// Two formats are supported ``{namespace}tag`` or just ``tag``.
     ///
     /// ```
-    /// QName::from("{http://www.w3.org/1999/xhtml}a")
+    /// # use elementtree::QName;
+    /// let a = QName::from("{http://www.w3.org/1999/xhtml}a");
     /// ```
     pub fn from(s: &'a str) -> QName<'a> {
         let mut ns = None;
