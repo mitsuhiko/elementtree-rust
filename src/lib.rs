@@ -237,7 +237,7 @@ pub struct Children<'a> {
 }
 
 /// An iterator over attributes of an element.
-pub struct Attributes<'a> {
+pub struct Attrs<'a> {
     iter: HashMapIter<'a, QName<'a>, String>,
 }
 
@@ -296,7 +296,7 @@ impl<'a> Iterator for Children<'a> {
     }
 }
 
-impl<'a> Iterator for Attributes<'a> {
+impl<'a> Iterator for Attrs<'a> {
     type Item = (&'a QName<'a>, &'a str);
 
     fn next(&mut self) -> Option<(&'a QName<'a>, &'a str)> {
@@ -465,10 +465,15 @@ impl Element {
     }
 
     /// Returns an iterator over all attributes
-    pub fn attributes<'a>(&'a self) -> Attributes<'a> {
-        Attributes {
+    pub fn attrs<'a>(&'a self) -> Attrs<'a> {
+        Attrs {
             iter: self.attributes.iter(),
         }
+    }
+
+    /// Count the attributes
+    pub fn attr_count(&self) -> usize {
+        self.attributes.len()
     }
 
     /// Finds the first element that match a given path downwards
