@@ -275,35 +275,35 @@ pub struct FindChildren<'a> {
 
 /// Errors that can occur parsing XML
 #[derive(Debug)]
-pub enum ParseError {
+pub enum Error {
     /// The XML is invalid
     MalformedXml(xml::reader::Error),
     /// This library is unable to process this XML. This can occur if, for
     /// example, the XML contains processing instructions.
-    UnexpectedEvent(XmlEvent),
+    UnexpectedEvent,
 }
 
-impl fmt::Display for ParseError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &ParseError::MalformedXml(ref e) => write!(f, "Malformed XML. {}", e),
-            &ParseError::UnexpectedEvent(..) => write!(f, "Unexpected XML event"),
+            &Error::MalformedXml(ref e) => write!(f, "Malformed XML. {}", e),
+            &Error::UnexpectedEvent => write!(f, "Unexpected XML event"),
         }
     }
 }
 
-impl std::error::Error for ParseError {
+impl std::error::Error for Error {
     fn description(&self) -> &str {
         match self {
-            &ParseError::MalformedXml(..) => "Malformed XML",
-            &ParseError::UnexpectedEvent(..) => "Unexpected XML event",
+            &Error::MalformedXml(..) => "Malformed XML",
+            &Error::UnexpectedEvent => "Unexpected XML element",
         }
     }
 
     fn cause(&self) -> Option<&std::error::Error> {
         match self {
-            &ParseError::MalformedXml(ref e) => Some(e),
-            &ParseError::UnexpectedEvent(..) => None,
+            &Error::MalformedXml(ref e) => Some(e),
+            &Error::UnexpectedEvent => None,
         }
     }
 }
@@ -353,7 +353,7 @@ impl<'a> Iterator for FindChildren<'a> {
 
 impl Element {
     /// Parses some data into an Element
-    pub fn from_reader<R: Read>(r: R) -> Result<Element, ParseError> {
+    pub fn from_reader<R: Read>(r: R) -> Result<Element, Error> {
         let mut reader = EventReader::new(r);
         loop {
             match reader.next() {
@@ -363,9 +363,11 @@ impl Element {
                 Ok(XmlEvent::Comment(..)) |
                 Ok(XmlEvent::Whitespace(..)) |
                 Ok(XmlEvent::StartDocument { .. }) |
-                Ok(XmlEvent::ProcessingInstruction { .. }) => continue,
-                Ok(evt) => return Err(ParseError::UnexpectedEvent(evt)),
-                Err(e) => return Err(ParseError::MalformedXml(e)),
+                Ok(XmlEvent::ProcessingInstruction { .. }) => {
+                    continue;
+                }
+                Ok(evt) => return Err(Error::UnexpectedEvent),
+                Err(e) => return Err(Error::MalformedXml(e)),
             }
         }
     }
@@ -373,7 +375,7 @@ impl Element {
     fn from_start_element<R: Read>(name: OwnedName,
                                    attributes: Vec<OwnedAttribute>,
                                    reader: &mut EventReader<R>)
-        -> Result<Element, ParseError>
+        -> Result<Element, Error>
     {
         let mut attr_map = HashMap::new();
         for attr in attributes {
@@ -393,7 +395,7 @@ impl Element {
 
     fn parse_children<R: Read>(&mut self,
                                reader: &mut EventReader<R>)
-        -> Result<(), ParseError>
+        -> Result<(), Error>
     {
         loop {
             match reader.next() {
@@ -402,9 +404,7 @@ impl Element {
                        name.namespace.as_ref().map(|x| x.as_str()) == self.tag.ns() {
                         return Ok(());
                     } else {
-                        return Err(ParseError::UnexpectedEvent(XmlEvent::EndElement {
-                            name: name.clone(),
-                        }));
+                        return Err(Error::UnexpectedEvent);
                     }
                 }
                 Ok(XmlEvent::StartElement { name, attributes, .. }) => {
@@ -419,13 +419,21 @@ impl Element {
                         self.text = Some(s);
                     }
                 }
-                Ok(XmlEvent::CData(s)) => self.text = Some(s),
+                Ok(XmlEvent::CData(s)) => {
+                    self.text = Some(s);
+                }
                 Ok(XmlEvent::Comment(..)) |
                 Ok(XmlEvent::Whitespace(..)) |
                 Ok(XmlEvent::StartDocument { .. }) |
-                Ok(XmlEvent::ProcessingInstruction { .. }) => continue,
-                Ok(evt) => return Err(ParseError::UnexpectedEvent(evt)),
-                Err(e) => return Err(ParseError::MalformedXml(e)),
+                Ok(XmlEvent::ProcessingInstruction { .. }) => {
+                    continue;
+                }
+                Ok(evt) => {
+                    return Err(Error::UnexpectedEvent);
+                }
+                Err(e) => {
+                    return Err(Error::MalformedXml(e));
+                }
             }
         }
     }
