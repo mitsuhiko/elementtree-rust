@@ -5,6 +5,7 @@ extern crate xml;
 extern crate string_cache;
 
 use std::collections::HashMap;
+use std::collections::hash_map::Iter as HashMapIter;
 use std::io::Read;
 use std::fmt;
 use std::ops::Deref;
@@ -235,6 +236,11 @@ pub struct Children<'a> {
     element: &'a Element,
 }
 
+/// An iterator over attributes of an element.
+pub struct Attributes<'a> {
+    iter: HashMapIter<'a, QName<'a>, String>,
+}
+
 /// An iterator over matching children.
 pub struct FindChildren<'a> {
     tag: Cow<'a, QName<'a>>,
@@ -284,6 +290,18 @@ impl<'a> Iterator for Children<'a> {
             let rv = &self.element.children[self.idx];
             self.idx += 1;
             Some(rv)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> Iterator for Attributes<'a> {
+    type Item = (&'a QName<'a>, &'a str);
+
+    fn next(&mut self) -> Option<(&'a QName<'a>, &'a str)> {
+        if let Some((k, v)) = self.iter.next() {
+            Some((k, v.as_str()))
         } else {
             None
         }
@@ -444,6 +462,13 @@ impl Element {
     /// Look up an attribute by qualified name.
     pub fn get_attr<'a, Q: AsQName<'a>>(&'a self, name: Q) -> Option<&'a str> {
         self.attributes.get(&name.as_qname()).map(|x| x.as_str())
+    }
+
+    /// Returns an iterator over all attributes
+    pub fn attributes<'a>(&'a self) -> Attributes<'a> {
+        Attributes {
+            iter: self.attributes.iter(),
+        }
     }
 
     /// Finds the first element that match a given path downwards

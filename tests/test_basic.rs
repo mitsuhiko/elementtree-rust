@@ -24,3 +24,26 @@ fn test_basics() {
     let tails: Vec<_> = list.children().map(|x| x.tail().trim()).collect();
     assert_eq!(tails.as_slice(), &["Tail 1", "Tail 2", "Tail 3"]);
 }
+
+#[test]
+fn test_attributes() {
+    let root = Element::from_reader(r#"<?xml version="1.0"?>
+    <root>
+        <list a="1" b="2" c="3">
+            <item attr="foo1"/>
+            <item attr="foo2"/>
+            <item attr="foo3"/>
+        </list>
+    </root>
+    "#.as_bytes()).unwrap();
+
+    let list = root.find("list").unwrap();
+    assert_eq!(list.tag(), &QName::from("list"));
+
+    let items: Vec<_> = list.children().map(|x| x.get_attr("attr").unwrap_or("")).collect();
+    assert_eq!(items.as_slice(), &["foo1", "foo2", "foo3"]);
+
+    let mut attrs: Vec<_> = list.attributes().map(|(k, v)| format!("{}={}", k, v)).collect();
+    attrs.sort();
+    assert_eq!(attrs.iter().map(|x| x.as_str()).collect::<Vec<_>>(), vec!["a=1", "b=2", "c=3"]);
+}
