@@ -74,3 +74,12 @@ fn test_namespaces() {
 
     assert_eq!(list.attr_count(), 3);
 }
+
+#[test]
+fn test_entities() {
+    let root = Element::from_reader(r#"<?xml version="1.0"?>
+    <root>&#83;</root>
+    "#.as_bytes()).unwrap();
+
+    assert_eq!(root.text(), "S");
+}
