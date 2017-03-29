@@ -295,6 +295,23 @@ impl NamespaceMap {
         self.ns_to_prefix.get(static_atom).map(|x| x.borrow())
     }
 
+    pub fn set_prefix(&mut self, url: &str, prefix: &str) -> Result<(), Error> {
+        let prefix = XmlAtom::Shared(Atom::from(prefix));
+        if self.prefix_to_ns.contains_key(&prefix) {
+            return Err(Error::DuplicateNamespacePrefix);
+        }
+
+        let url = XmlAtom::Shared(Atom::from(url));
+        if let Some(old_prefix) = self.ns_to_prefix.remove(&url) {
+            self.prefix_to_ns.remove(&old_prefix);
+        }
+
+        self.ns_to_prefix.insert(url.clone(), prefix.clone());
+        self.prefix_to_ns.insert(prefix.clone(), url.clone());
+
+        Ok(())
+    }
+
     fn generate_prefix(&self) -> XmlAtom<'static> {
         let mut i = 1;
         loop {
@@ -306,9 +323,9 @@ impl NamespaceMap {
         }
     }
 
-    pub fn register(&mut self, prefix: Option<&str>, url: &str) {
+    pub fn register_if_missing(&mut self, url: &str, prefix: Option<&str>) -> bool {
         if self.get_prefix(url).is_some() {
-            return;
+            return false;
         }
 
         let stored_prefix = if let Some(prefix) = prefix {
@@ -325,6 +342,7 @@ impl NamespaceMap {
         let url = XmlAtom::Shared(Atom::from(url));
         self.prefix_to_ns.insert(stored_prefix.clone(), url.clone());
         self.ns_to_prefix.insert(url, stored_prefix);
+        true
     }
 }
 
@@ -335,6 +353,7 @@ pub struct Element {
     attributes: HashMap<QName<'static>, String>,
     children: Vec<Element>,
     nsmap: Option<Rc<NamespaceMap>>,
+    emit_nsmap: bool,
     text: Option<String>,
     tail: Option<String>,
 }
@@ -366,6 +385,8 @@ pub enum Error {
     /// This library is unable to process this XML. This can occur if, for
     /// example, the XML contains processing instructions.
     UnexpectedEvent,
+    /// A namespace prefix was already used
+    DuplicateNamespacePrefix,
 }
 
 impl fmt::Display for Error {
@@ -374,6 +395,8 @@ impl fmt::Display for Error {
             &Error::MalformedXml(ref e) => write!(f, "Malformed XML. {}", e),
             &Error::Io(ref e) => write!(f, "{}", e),
             &Error::UnexpectedEvent => write!(f, "Unexpected XML event"),
+            &Error::DuplicateNamespacePrefix => write!(
+                f, "Encountered duplicated namespace prefix"),
         }
     }
 }
@@ -384,6 +407,7 @@ impl std::error::Error for Error {
             &Error::MalformedXml(..) => "Malformed XML",
             &Error::Io(..) => "IO error",
             &Error::UnexpectedEvent => "Unexpected XML element",
+            &Error::DuplicateNamespacePrefix => "Duplicated namespace prefix",
         }
     }
 
@@ -391,7 +415,7 @@ impl std::error::Error for Error {
         match self {
             &Error::MalformedXml(ref e) => Some(e),
             &Error::Io(ref e) => Some(e),
-            &Error::UnexpectedEvent => None,
+            _ => None,
         }
     }
 }
@@ -451,14 +475,7 @@ impl<'a> Iterator for FindChildren<'a> {
 impl Element {
     /// Creates a new element without any children but a given tag.
     pub fn new<'a>(tag: &QName<'a>) -> Element {
-        Element {
-            tag: tag.share(),
-            attributes: HashMap::new(),
-            nsmap: None,
-            children: vec![],
-            text: None,
-            tail: None,
-        }
+        Element::new_with_nsmap(tag, None)
     }
 
     /// Creates a new element without any children but inheriting the
@@ -468,8 +485,23 @@ impl Element {
     /// across elements for as long as no further modifications are
     /// taking place.
     pub fn new_with_namespaces<'a>(tag: &QName<'a>, reference: &Element) -> Element {
-        let mut rv = Element::new(tag);
-        rv.nsmap = reference.nsmap.clone();
+        Element::new_with_nsmap(tag, reference.nsmap.clone())
+    }
+
+    fn new_with_nsmap<'a>(tag: &QName<'a>, nsmap: Option<Rc<NamespaceMap>>) -> Element {
+        let mut rv = Element {
+            tag: tag.share(),
+            attributes: HashMap::new(),
+            nsmap: nsmap,
+            emit_nsmap: false,
+            children: vec![],
+            text: None,
+            tail: None,
+        };
+        if let Some(url) = tag.ns() {
+            let prefix = rv.get_namespace_prefix(url).unwrap_or("").to_string();
+            rv.register_namespace(url, Some(&prefix));
+        }
         rv
     }
 
@@ -525,10 +557,19 @@ impl Element {
             });
         }
 
+        let mut namespace = XmlNamespaceMap::empty();
+        if self.emit_nsmap {
+            if let Some(ref nsmap) = self.nsmap {
+                for (prefix, url) in &nsmap.prefix_to_ns {
+                    namespace.put(prefix.borrow(), url.borrow());
+                }
+            }
+        }
+
         w.write(XmlWriteEvent::StartElement {
             name: name,
             attributes: Cow::Owned(attributes),
-            namespace: Cow::Owned(XmlNamespaceMap::empty()),
+            namespace: Cow::Owned(namespace),
         })?;
 
         for elem in &self.children {
@@ -549,19 +590,18 @@ impl Element {
                                    reader: &mut EventReader<R>)
         -> Result<Element, Error>
     {
-        let mut attr_map = HashMap::new();
-        for attr in attributes {
-            attr_map.insert(QName::from_owned_name(attr.name), attr.value);
-        }
-
         let mut root = Element {
             tag: QName::from_owned_name(name),
-            attributes: attr_map,
+            attributes: HashMap::new(),
             nsmap: parent_nsmap,
+            emit_nsmap: false,
             children: vec![],
             text: None,
             tail: None,
         };
+        for attr in attributes {
+            root.attributes.insert(QName::from_owned_name(attr.name), attr.value);
+        }
 
         if !namespace.is_essentially_empty() {
             for (prefix, url) in namespace.0.iter() {
@@ -780,7 +820,23 @@ impl Element {
     /// is already used a random one is used instead.
     pub fn register_namespace(&mut self, url: &str, prefix: Option<&str>) {
         if self.get_namespace_prefix(url).is_none() {
-            self.get_nsmap_mut().register(prefix, url);
+            if self.get_nsmap_mut().register_if_missing(url, prefix) {
+                self.emit_nsmap = true;
+            }
+        }
+    }
+
+    /// Sets a specific namespace prefix.  This will also register the
+    /// namespace if it was unknown so far.
+    ///
+    /// In case a prefix is set that is already set elsewhere an error is
+    /// returned.  It's recommended that this method is only used on the
+    /// root node before other prefixes are added.
+    pub fn set_namespace_prefix(&mut self, url: &str, prefix: &str) -> Result<(), Error> {
+        if self.get_namespace_prefix(url) == Some(prefix) {
+            Ok(())
+        } else {
+            self.get_nsmap_mut().set_prefix(url, prefix)
         }
     }
 

@@ -93,3 +93,13 @@ fn test_entities() {
 
     assert_eq!(root.text(), "S");
 }
+
+#[test]
+fn test_write_stuff() {
+    let mut root = Element::new(&QName::from("{myns}root"));
+    root.set_namespace_prefix("myns", "x").unwrap();
+    let mut out: Vec<u8> = Vec::new();
+    root.to_writer(&mut out).unwrap();
+    let out = String::from_utf8(out).unwrap();
+    assert_eq!(&out, "<?xml version=\"1.0\" encoding=\"utf-8\"?><x:root xmlns:x=\"myns\" />");
+}
