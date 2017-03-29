@@ -774,13 +774,14 @@ impl Element {
     }
 
     /// Sets a new text value for the tag.
-    pub fn set_text<S: Into<String>>(&mut self, value: S) {
+    pub fn set_text<S: Into<String>>(&mut self, value: S) -> &mut Element {
         let value = value.into();
         if value.is_empty() {
             self.text = None;
         } else {
             self.text = Some(value);
         }
+        self
     }
 
     /// Returns the tail text of a tag.
@@ -791,13 +792,14 @@ impl Element {
     }
 
     /// Sets a new tail text value for the tag.
-    pub fn set_tail<S: Into<String>>(&mut self, value: S) {
+    pub fn set_tail<S: Into<String>>(&mut self, value: S) -> &mut Element {
         let value = value.into();
         if value.is_empty() {
             self.tail = None;
         } else {
             self.tail = Some(value);
         }
+        self
     }
 
     /// The tag of the element as qualified name.
@@ -809,8 +811,9 @@ impl Element {
     }
 
     /// Sets a new tag for the element.
-    pub fn set_tag<'a>(&mut self, tag: &QName<'a>) {
+    pub fn set_tag<'a>(&mut self, tag: &QName<'a>) -> &mut Element {
         self.tag = tag.share();
+        self
     }
 
     /// Returns the number of children
@@ -840,17 +843,35 @@ impl Element {
         }
     }
 
-    /// Appends a new child and returns a mutable reference ot it.
+    /// Appends a new child and returns a reference to self.
     pub fn append_child(&mut self, child: Element) -> &mut Element {
         self.children.push(child);
-        let idx = self.children.len() - 1;
-        &mut self.children[idx]
+        self
     }
 
-    /// Appends a new child to the element and returns it.
+    /// Appends a new child to the element and returns a reference to it.
+    ///
+    /// This uses ``Element::new_with_namespaces`` internally and can
+    /// then be used like this:
+    ///
+    /// ```
+    /// use elementtree::Element;
+    ///
+    /// let ns = "http://example.invalid/#ns"
+    /// let mut root = Element::new((ns, "mydoc"));
+    ///
+    /// {
+    ///     let mut list = root.append_new_child((ns, "list"));
+    ///     for x in 0..3 {
+    ///         list.append_new_child((ns, "item")).set_text(format!("Item {}", x));
+    ///     }
+    /// }
+    /// ```
     pub fn append_new_child<'a, Q: AsQName<'a>>(&'a mut self, tag: Q) -> &'a mut Element {
         let child = Element::new_with_namespaces(tag, self);
-        self.append_child(child)
+        self.append_child(child);
+        let idx = self.children.len() - 1;
+        &mut self.children[idx]
     }
 
     /// Returns an iterator over all children.
@@ -889,8 +910,13 @@ impl Element {
     }
 
     /// Sets a new attribute.
-    pub fn set_attr<'a, Q: AsQName<'a>, S: Into<String>>(&'a mut self, name: Q, value: S) {
+    ///
+    /// This returns a reference to the element so you can chain the calls.
+    pub fn set_attr<'a, Q: AsQName<'a>, S: Into<String>>(
+        &'a mut self, name: Q, value: S) -> &'a mut Element
+    {
         self.attributes.insert(name.as_qname().share(), value.into());
+        self
     }
 
     /// Removes an attribute and returns the stored string.
