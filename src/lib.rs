@@ -608,6 +608,12 @@ impl Element {
     /// This will create an XML document with a processing instruction
     /// to start it.  There is currently no API to only serialize a non
     /// standalone element.
+    ///
+    /// Currently the writer has no way to customize what is generated
+    /// in particular there is no support yet for automatically indenting
+    /// elements.  The reason for this is that there is no way to ignore
+    /// this information automatically in the absence of DTD support which
+    /// is not really planned.
     pub fn to_writer<W: Write>(&self, w: W) -> Result<(), Error> {
         let mut writer = EventWriter::new(w);
         writer.write(XmlWriteEvent::StartDocument {
@@ -759,7 +765,10 @@ impl Element {
         }
     }
 
-    /// Returns the text of a tag
+    /// Returns the text of a tag.
+    ///
+    /// Note that this does not trim or modify whitespace so the return
+    /// value might contain structural information from the XML file.
     pub fn text(&self) -> &str {
         self.text.as_ref().map(|x| x.as_str()).unwrap_or("")
     }
@@ -774,7 +783,9 @@ impl Element {
         }
     }
 
-    /// Returns the tail text of a tag
+    /// Returns the tail text of a tag.
+    ///
+    /// The tail is the text following an element.
     pub fn tail(&self) -> &str {
         self.tail.as_ref().map(|x| x.as_str()).unwrap_or("")
     }
@@ -789,7 +800,10 @@ impl Element {
         }
     }
 
-    /// The tag of the element as qualified name
+    /// The tag of the element as qualified name.
+    ///
+    /// Use the `QName` functionality to extract the information from the
+    /// tag name you care about (like the local name).
     pub fn tag(&self) -> &QName {
         &self.tag
     }
@@ -826,9 +840,17 @@ impl Element {
         }
     }
 
-    /// Appends a new child
-    pub fn append_child(&mut self, child: Element) {
+    /// Appends a new child and returns a mutable reference ot it.
+    pub fn append_child(&mut self, child: Element) -> &mut Element {
         self.children.push(child);
+        let idx = self.children.len() - 1;
+        &mut self.children[idx]
+    }
+
+    /// Appends a new child to the element and returns it.
+    pub fn append_new_child<'a, Q: AsQName<'a>>(&'a mut self, tag: Q) -> &'a mut Element {
+        let child = Element::new_with_namespaces(tag, self);
+        self.append_child(child)
     }
 
     /// Returns an iterator over all children.

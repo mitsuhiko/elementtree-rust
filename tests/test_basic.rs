@@ -130,6 +130,30 @@ fn test_basic_creation() {
 }
 
 #[test]
+fn test_alternative_creation() {
+    let mut root = Element::new("{demo}mydoc");
+    root.set_namespace_prefix("demo", "").unwrap();
+
+    {
+        let mut list = root.append_new_child("{demo}list");
+        for x in 0..3 {
+            let mut child = list.append_new_child("{demo}item");
+            child.set_text(format!("Item {}", x));
+        }
+    }
+
+    assert_eq!(&root.to_string().unwrap(), "\
+        <?xml version=\"1.0\" encoding=\"utf-8\"?>\
+        <mydoc xmlns=\"demo\">\
+            <list>\
+                <item>Item 0</item>\
+                <item>Item 1</item>\
+                <item>Item 2</item>\
+            </list>\
+        </mydoc>");
+}
+
+#[test]
 fn test_whitespace() {
     let root = Element::from_reader(r#"<?xml version="1.0"?>
     <root>
