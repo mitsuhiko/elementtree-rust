@@ -26,6 +26,37 @@
 //! for child in list.find_all("{tag:myns}item") {
 //!     println!("attribute: {}", child.get_attr("{tag:otherns}attr").unwrap());
 //! }
+//!
+//! ## Design Notes
+//!
+//! This library largely follows the ideas of Python's ElementTree but it has some
+//! specific changes that simplify the model for Rust.  In particular nodes do not
+//! know about their parents or siblings.  While this obviously reduces a lot of
+//! what would be possible with the library it significantly simplifies memory
+//! management and the external API.
+//!
+//! If you are coming from a DOM environment the following differences are the
+//! most striking:
+//!
+//! *   There are no text nodes, instead text is stored either in the `text`
+//!     attribute of a node or in the `tail` of a child node.  This means that
+//!     for most situations just working with the `text` is what you want and
+//!     you can ignore the existence of the `tail`.
+//! *   tags and attributes are implemented through a `QName` abstraction that
+//!     simplifies working wiht namespaces.  Most APIs just accept strings and
+//!     will create `QName`s automatically.
+//! *   namespace prefixes never play a role and are in fact not really exposed.
+//!     Instead all namespaces are managed through their canonical identifier.
+//!
+//! ## Notes on Namespaces
+//!
+//! Namespaces are internally tracked in a shared map attached to elements.  The
+//! map is not exposed but when an element is created another element can be passed
+//! in and the namespace map is copied over.  Internally a copy on write mechanism
+//! is used so when changes are performed on the namespace the namespaces will be
+//! copied and the writer will emit them accordingly.
+//!
+//! Namespaces need to be registered or the XML generated will be malformed.
 //! ```
 extern crate xml;
 extern crate string_cache;
