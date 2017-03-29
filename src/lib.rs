@@ -26,6 +26,7 @@
 //! for child in list.find_all("{tag:myns}item") {
 //!     println!("attribute: {}", child.get_attr("{tag:otherns}attr").unwrap());
 //! }
+//! ```
 //!
 //! ## Design Notes
 //!
@@ -57,7 +58,6 @@
 //! copied and the writer will emit them accordingly.
 //!
 //! Namespaces need to be registered or the XML generated will be malformed.
-//! ```
 extern crate xml;
 extern crate string_cache;
 
@@ -75,7 +75,7 @@ use std::rc::Rc;
 
 use string_cache::DefaultAtom as Atom;
 
-use xml::reader::{EventReader, XmlEvent};
+use xml::reader::{EventReader, ParserConfig, XmlEvent};
 use xml::writer::{EventWriter, XmlEvent as XmlWriteEvent, Error as XmlWriteError};
 use xml::common::XmlVersion;
 use xml::attribute::{Attribute, OwnedAttribute};
@@ -387,6 +387,36 @@ impl NamespaceMap {
 }
 
 /// Represents an XML element.
+///
+/// Usually constructed from either parsing or one of the two constructors
+/// an element is part of a tree and represents an XML element and the
+/// children contained.
+///
+/// Imagine a structure like this:
+///
+/// ```xml
+/// <p>Hello <strong>World</strong>!</p>
+/// ```
+///
+/// In this case the structure is more or less represented like this:
+///
+/// ```ignore
+/// Element {
+///   tag: "p",
+///   text: "Hello ",
+///   tail: None,
+///   children: [
+///     Element {
+///       tag: "strong",
+///       text: "World",
+///       tail: Some("!")
+///     }
+///   ]
+/// }
+/// ```
+///
+/// Namespaces are internally managed and inherited downwards when an
+/// element is created.
 #[derive(Debug, Clone)]
 pub struct Element {
     tag: QName<'static>,
@@ -514,6 +544,11 @@ impl<'a> Iterator for FindChildren<'a> {
 
 impl Element {
     /// Creates a new element without any children but a given tag.
+    ///
+    /// This can be used at all times to create a new element however when you
+    /// work with namespaces it's recommended to only use this for the root
+    /// element and then create further children through `new_with_namespaces`
+    /// as otherwise namespaces will not be propagaged downwards properly.
     pub fn new<'a, Q: AsQName<'a>>(tag: Q) -> Element {
         Element::new_with_nsmap(&tag.as_qname(), None)
     }
@@ -545,9 +580,11 @@ impl Element {
         rv
     }
 
-    /// Parses some data into an Element
+    /// Parses some XML data into an `Element` from a reader.
     pub fn from_reader<R: Read>(r: R) -> Result<Element, Error> {
-        let mut reader = EventReader::new(r);
+        let cfg = ParserConfig::new()
+            .whitespace_to_characters(true);
+        let mut reader = cfg.create_reader(r);
         loop {
             match reader.next() {
                 Ok(XmlEvent::StartElement { name, attributes, namespace }) => {
@@ -566,7 +603,11 @@ impl Element {
         }
     }
 
-    /// Dump an element as XML document into a writer
+    /// Dump an element as XML document into a writer.
+    ///
+    /// This will create an XML document with a processing instruction
+    /// to start it.  There is currently no API to only serialize a non
+    /// standalone element.
     pub fn to_writer<W: Write>(&self, w: W) -> Result<(), Error> {
         let mut writer = EventWriter::new(w);
         writer.write(XmlWriteEvent::StartDocument {

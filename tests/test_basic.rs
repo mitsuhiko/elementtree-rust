@@ -128,3 +128,24 @@ fn test_basic_creation() {
             </list>\
         </mydoc>");
 }
+
+#[test]
+fn test_whitespace() {
+    let root = Element::from_reader(r#"<?xml version="1.0"?>
+    <root>
+        <list>
+            <item> Item 1 </item>Tail 1
+            <item> Item 2 </item>Tail 2
+            <item> Item 3 </item>Tail 3
+        </list>
+    </root>
+    "#.as_bytes()).unwrap();
+
+    assert_eq!(root.text(), "\n        ");
+
+    let list = root.find("list").unwrap();
+    assert_eq!(list.tag(), &QName::from("list"));
+
+    let items: Vec<_> = list.children().map(|x| x.text()).collect();
+    assert_eq!(items.as_slice(), &[" Item 1 ", " Item 2 ", " Item 3 "]);
+}
