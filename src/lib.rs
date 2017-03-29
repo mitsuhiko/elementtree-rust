@@ -237,7 +237,16 @@ impl<'a> QName<'a> {
     fn from_owned_name(name: OwnedName) -> QName<'static> {
         QName {
             name: XmlAtom::Shared(Atom::from(name.local_name)),
-            ns: name.namespace.map(|x| XmlAtom::Shared(Atom::from(x))),
+            ns: match name.namespace {
+                Some(ns) => {
+                    if ns.len() > 0 {
+                        Some(XmlAtom::Shared(Atom::from(ns)))
+                    } else {
+                        None
+                    }
+                },
+                _ => None,
+            }
         }
     }
 }
@@ -474,8 +483,8 @@ impl<'a> Iterator for FindChildren<'a> {
 
 impl Element {
     /// Creates a new element without any children but a given tag.
-    pub fn new<'a>(tag: &QName<'a>) -> Element {
-        Element::new_with_nsmap(tag, None)
+    pub fn new<'a, Q: AsQName<'a>>(tag: Q) -> Element {
+        Element::new_with_nsmap(&tag.as_qname(), None)
     }
 
     /// Creates a new element without any children but inheriting the
@@ -484,8 +493,8 @@ impl Element {
     /// This has the advantage that internally the map will be shared
     /// across elements for as long as no further modifications are
     /// taking place.
-    pub fn new_with_namespaces<'a>(tag: &QName<'a>, reference: &Element) -> Element {
-        Element::new_with_nsmap(tag, reference.nsmap.clone())
+    pub fn new_with_namespaces<'a, Q: AsQName<'a>>(tag: Q, reference: &Element) -> Element {
+        Element::new_with_nsmap(&tag.as_qname(), reference.nsmap.clone())
     }
 
     fn new_with_nsmap<'a>(tag: &QName<'a>, nsmap: Option<Rc<NamespaceMap>>) -> Element {
@@ -537,22 +546,33 @@ impl Element {
         self.dump_into_writer(&mut writer)
     }
 
-    fn dump_into_writer<W: Write>(&self, w: &mut EventWriter<W>) -> Result<(), Error> {
-        let mut name = Name::local(self.tag.name());
-        if let Some(url) = self.tag.ns() {
+    /// Dump an element as XML document into a string
+    pub fn to_string(&self) -> Result<String, Error> {
+        let mut out: Vec<u8> = Vec::new();
+        self.to_writer(&mut out)?;
+        Ok(String::from_utf8(out).unwrap())
+    }
+
+    fn get_xml_name<'a>(&'a self, qname: &'a QName<'a>) -> Name<'a> {
+        let mut name = Name::local(qname.name());
+        if let Some(url) = qname.ns() {
             name.namespace = Some(url);
-            name.prefix = self.get_namespace_prefix(url);
+            if let Some(prefix) = self.get_namespace_prefix(url) {
+                if !prefix.is_empty() {
+                    name.prefix = Some(prefix);
+                }
+            }
         }
+        name
+    }
+
+    fn dump_into_writer<W: Write>(&self, w: &mut EventWriter<W>) -> Result<(), Error> {
+        let name = self.get_xml_name(&self.tag);
 
         let mut attributes = Vec::with_capacity(self.attributes.len());
         for (k, v) in self.attributes.iter() {
-            let attr_name = Name::local(k.name());
-            if let Some(url) = k.ns() {
-                name.namespace = Some(url);
-                name.prefix = self.get_namespace_prefix(url);
-            }
             attributes.push(Attribute {
-                name: attr_name,
+                name: self.get_xml_name(k),
                 value: v,
             });
         }
@@ -572,8 +592,17 @@ impl Element {
             namespace: Cow::Owned(namespace),
         })?;
 
+        let text = self.text();
+        if !text.is_empty() {
+            w.write(XmlWriteEvent::Characters(text))?;
+        }
+
         for elem in &self.children {
             elem.dump_into_writer(w)?;
+            let text = elem.tail();
+            if !text.is_empty() {
+                w.write(XmlWriteEvent::Characters(text))?;
+            }
         }
 
         w.write(XmlWriteEvent::EndElement {
@@ -664,11 +693,12 @@ impl Element {
     }
 
     /// Sets a new text value for the tag.
-    pub fn set_text(&mut self, value: &str) {
+    pub fn set_text<S: Into<String>>(&mut self, value: S) {
+        let value = value.into();
         if value.is_empty() {
             self.text = None;
         } else {
-            self.text = Some(value.to_string());
+            self.text = Some(value);
         }
     }
 
@@ -678,11 +708,12 @@ impl Element {
     }
 
     /// Sets a new tail text value for the tag.
-    pub fn set_tail(&mut self, value: &str) {
+    pub fn set_tail<S: Into<String>>(&mut self, value: S) {
+        let value = value.into();
         if value.is_empty() {
             self.tail = None;
         } else {
-            self.tail = Some(value.to_string());
+            self.tail = Some(value);
         }
     }
 
@@ -764,8 +795,8 @@ impl Element {
     }
 
     /// Sets a new attribute.
-    pub fn set_attr<'a, Q: AsQName<'a>, S: AsRef<str>>(&'a mut self, name: Q, value: S) {
-        self.attributes.insert(name.as_qname().share(), value.as_ref().to_string());
+    pub fn set_attr<'a, Q: AsQName<'a>, S: Into<String>>(&'a mut self, name: Q, value: S) {
+        self.attributes.insert(name.as_qname().share(), value.into());
     }
 
     /// Removes an attribute and returns the stored string.

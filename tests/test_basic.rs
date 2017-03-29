@@ -103,3 +103,28 @@ fn test_write_stuff() {
     let out = String::from_utf8(out).unwrap();
     assert_eq!(&out, "<?xml version=\"1.0\" encoding=\"utf-8\"?><x:root xmlns:x=\"myns\" />");
 }
+
+#[test]
+fn test_basic_creation() {
+    let mut root = Element::new("{demo}mydoc");
+    root.set_namespace_prefix("demo", "").unwrap();
+
+    let mut list = Element::new_with_namespaces("{demo}list", &root);
+
+    for x in 0..3 {
+        let mut child = Element::new_with_namespaces("{demo}item", &root);
+        child.set_text(format!("Item {}", x));
+        list.append_child(child);
+    }
+
+    root.append_child(list);
+    assert_eq!(&root.to_string().unwrap(), "\
+        <?xml version=\"1.0\" encoding=\"utf-8\"?>\
+        <mydoc xmlns=\"demo\">\
+            <list>\
+                <item>Item 0</item>\
+                <item>Item 1</item>\
+                <item>Item 2</item>\
+            </list>\
+        </mydoc>");
+}
