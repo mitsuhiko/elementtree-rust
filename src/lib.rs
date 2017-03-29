@@ -30,20 +30,27 @@
 extern crate xml;
 extern crate string_cache;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::collections::hash_map::Iter as HashMapIter;
-use std::io::Read;
+use std::io::{Read, Write};
+use std::io;
 use std::fmt;
 use std::mem;
 use std::ops::Deref;
+use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::borrow::Cow;
+use std::rc::Rc;
 
 use string_cache::DefaultAtom as Atom;
 
 use xml::reader::{EventReader, XmlEvent};
-use xml::attribute::OwnedAttribute;
-use xml::name::OwnedName;
+use xml::writer::{EventWriter, XmlEvent as XmlWriteEvent, Error as XmlWriteError};
+use xml::common::XmlVersion;
+use xml::attribute::{Attribute, OwnedAttribute};
+use xml::name::{Name, OwnedName};
+use xml::namespace::{Namespace as XmlNamespaceMap, NS_EMPTY_URI,
+                     NS_XMLNS_URI, NS_XML_URI};
 
 enum XmlAtom<'a> {
     Shared(Atom),
@@ -78,6 +85,26 @@ impl<'a> fmt::Debug for XmlAtom<'a> {
 impl<'a> Clone for XmlAtom<'a> {
     fn clone(&self) -> XmlAtom<'a> {
         XmlAtom::Shared(Atom::from(self.borrow()))
+    }
+}
+
+impl<'a> PartialEq for XmlAtom<'a> {
+    fn eq(&self, other: &XmlAtom<'a>) -> bool {
+        self.borrow().eq(other.borrow())
+    }
+}
+
+impl<'a> Eq for XmlAtom<'a> {}
+
+impl<'a> PartialOrd for XmlAtom<'a> {
+    fn partial_cmp(&self, other: &XmlAtom<'a>) -> Option<Ordering> {
+        self.borrow().partial_cmp(other.borrow())
+    }
+}
+
+impl<'a> Ord for XmlAtom<'a> {
+    fn cmp(&self, other: &XmlAtom<'a>) -> Ordering {
+        self.borrow().cmp(other.borrow())
     }
 }
 
@@ -247,12 +274,67 @@ impl<'a> Hash for QName<'a> {
     }
 }
 
+#[derive(Debug, Clone)]
+struct NamespaceMap {
+    prefix_to_ns: BTreeMap<XmlAtom<'static>, XmlAtom<'static>>,
+    ns_to_prefix: BTreeMap<XmlAtom<'static>, XmlAtom<'static>>,
+}
+
+impl NamespaceMap {
+    pub fn new() -> NamespaceMap {
+        NamespaceMap {
+            prefix_to_ns: BTreeMap::new(),
+            ns_to_prefix: BTreeMap::new(),
+        }
+    }
+
+    pub fn get_prefix(&self, url: &str) -> Option<&str> {
+        // same shit as with remove_attr below for the explanation.
+        let atom = XmlAtom::Borrowed(url);
+        let static_atom: &XmlAtom<'static> = unsafe { mem::transmute(&atom) };
+        self.ns_to_prefix.get(static_atom).map(|x| x.borrow())
+    }
+
+    fn generate_prefix(&self) -> XmlAtom<'static> {
+        let mut i = 1;
+        loop {
+            let random_prefix = format!("ns{}", i);
+            if !self.prefix_to_ns.contains_key(&XmlAtom::Borrowed(&random_prefix)) {
+                return XmlAtom::Shared(Atom::from(random_prefix));
+            }
+            i += 1;
+        }
+    }
+
+    pub fn register(&mut self, prefix: Option<&str>, url: &str) {
+        if self.get_prefix(url).is_some() {
+            return;
+        }
+
+        let stored_prefix = if let Some(prefix) = prefix {
+            let prefix = XmlAtom::Borrowed(prefix);
+            if self.prefix_to_ns.get(&prefix).is_some() {
+                self.generate_prefix()
+            } else {
+                XmlAtom::Shared(Atom::from(prefix.borrow()))
+            }
+        } else {
+            self.generate_prefix()
+        };
+
+        let url = XmlAtom::Shared(Atom::from(url));
+        self.prefix_to_ns.insert(stored_prefix.clone(), url.clone());
+        self.ns_to_prefix.insert(url, stored_prefix);
+    }
+}
+
 /// Represents an XML element.
 #[derive(Debug, Clone)]
 pub struct Element {
     tag: QName<'static>,
     attributes: HashMap<QName<'static>, String>,
     children: Vec<Element>,
+    nsmap: Option<Rc<NamespaceMap>>,
     text: Option<String>,
     tail: Option<String>,
 }
@@ -279,6 +361,8 @@ pub struct FindChildren<'a> {
 pub enum Error {
     /// The XML is invalid
     MalformedXml(xml::reader::Error),
+    /// An IO Error
+    Io(io::Error),
     /// This library is unable to process this XML. This can occur if, for
     /// example, the XML contains processing instructions.
     UnexpectedEvent,
@@ -288,6 +372,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &Error::MalformedXml(ref e) => write!(f, "Malformed XML. {}", e),
+            &Error::Io(ref e) => write!(f, "{}", e),
             &Error::UnexpectedEvent => write!(f, "Unexpected XML event"),
         }
     }
@@ -297,6 +382,7 @@ impl std::error::Error for Error {
     fn description(&self) -> &str {
         match self {
             &Error::MalformedXml(..) => "Malformed XML",
+            &Error::Io(..) => "IO error",
             &Error::UnexpectedEvent => "Unexpected XML element",
         }
     }
@@ -304,7 +390,17 @@ impl std::error::Error for Error {
     fn cause(&self) -> Option<&std::error::Error> {
         match self {
             &Error::MalformedXml(ref e) => Some(e),
+            &Error::Io(ref e) => Some(e),
             &Error::UnexpectedEvent => None,
+        }
+    }
+}
+
+impl From<XmlWriteError> for Error {
+    fn from(err: XmlWriteError) -> Error {
+        match err {
+            XmlWriteError::Io(err) => Error::Io(err),
+            err => { return Err(err).unwrap(); }
         }
     }
 }
@@ -358,10 +454,23 @@ impl Element {
         Element {
             tag: tag.share(),
             attributes: HashMap::new(),
+            nsmap: None,
             children: vec![],
             text: None,
             tail: None,
         }
+    }
+
+    /// Creates a new element without any children but inheriting the
+    /// namespaces from another element.
+    ///
+    /// This has the advantage that internally the map will be shared
+    /// across elements for as long as no further modifications are
+    /// taking place.
+    pub fn new_with_namespaces<'a>(tag: &QName<'a>, reference: &Element) -> Element {
+        let mut rv = Element::new(tag);
+        rv.nsmap = reference.nsmap.clone();
+        rv
     }
 
     /// Parses some data into an Element
@@ -369,8 +478,9 @@ impl Element {
         let mut reader = EventReader::new(r);
         loop {
             match reader.next() {
-                Ok(XmlEvent::StartElement { name, attributes, .. }) => {
-                    return Element::from_start_element(name, attributes, &mut reader);
+                Ok(XmlEvent::StartElement { name, attributes, namespace }) => {
+                    return Element::from_start_element(
+                        name, attributes, namespace, None, &mut reader);
                 }
                 Ok(XmlEvent::Comment(..)) |
                 Ok(XmlEvent::Whitespace(..)) |
@@ -384,8 +494,58 @@ impl Element {
         }
     }
 
+    /// Dump an element as XML document into a writer
+    pub fn to_writer<W: Write>(&self, w: W) -> Result<(), Error> {
+        let mut writer = EventWriter::new(w);
+        writer.write(XmlWriteEvent::StartDocument {
+            version: XmlVersion::Version10,
+            encoding: Some("utf-8"),
+            standalone: None,
+        })?;
+        self.dump_into_writer(&mut writer)
+    }
+
+    fn dump_into_writer<W: Write>(&self, w: &mut EventWriter<W>) -> Result<(), Error> {
+        let mut name = Name::local(self.tag.name());
+        if let Some(url) = self.tag.ns() {
+            name.namespace = Some(url);
+            name.prefix = self.get_namespace_prefix(url);
+        }
+
+        let mut attributes = Vec::with_capacity(self.attributes.len());
+        for (k, v) in self.attributes.iter() {
+            let attr_name = Name::local(k.name());
+            if let Some(url) = k.ns() {
+                name.namespace = Some(url);
+                name.prefix = self.get_namespace_prefix(url);
+            }
+            attributes.push(Attribute {
+                name: attr_name,
+                value: v,
+            });
+        }
+
+        w.write(XmlWriteEvent::StartElement {
+            name: name,
+            attributes: Cow::Owned(attributes),
+            namespace: Cow::Owned(XmlNamespaceMap::empty()),
+        })?;
+
+        for elem in &self.children {
+            elem.dump_into_writer(w)?;
+        }
+
+        w.write(XmlWriteEvent::EndElement {
+            name: Some(name),
+        })?;
+
+        Ok(())
+    }
+
     fn from_start_element<R: Read>(name: OwnedName,
                                    attributes: Vec<OwnedAttribute>,
+                                   namespace: XmlNamespaceMap,
+                                   parent_nsmap: Option<Rc<NamespaceMap>>,
                                    reader: &mut EventReader<R>)
         -> Result<Element, Error>
     {
@@ -397,10 +557,18 @@ impl Element {
         let mut root = Element {
             tag: QName::from_owned_name(name),
             attributes: attr_map,
+            nsmap: parent_nsmap,
             children: vec![],
             text: None,
             tail: None,
         };
+
+        if !namespace.is_essentially_empty() {
+            for (prefix, url) in namespace.0.iter() {
+                root.register_namespace(url, Some(prefix));
+            }
+        };
+
         root.parse_children(reader)?;
         Ok(root)
     }
@@ -419,9 +587,9 @@ impl Element {
                         return Err(Error::UnexpectedEvent);
                     }
                 }
-                Ok(XmlEvent::StartElement { name, attributes, .. }) => {
+                Ok(XmlEvent::StartElement { name, attributes, namespace }) => {
                     self.children.push(Element::from_start_element(
-                        name, attributes, reader)?);
+                        name, attributes, namespace, self.nsmap.clone(), reader)?);
                 }
                 Ok(XmlEvent::Characters(s)) => {
                     let child_count = self.children.len();
@@ -589,6 +757,47 @@ impl Element {
     /// Count the attributes
     pub fn attr_count(&self) -> usize {
         self.attributes.len()
+    }
+
+    fn get_nsmap_mut(&mut self) -> &mut NamespaceMap {
+        let new_map = match self.nsmap {
+            Some(ref mut nsmap) if Rc::strong_count(nsmap) == 1 => None,
+            Some(ref mut nsmap) => Some(Rc::new((**nsmap).clone())),
+            None => Some(Rc::new(NamespaceMap::new())),
+        };
+        if let Some(nsmap) = new_map {
+            self.nsmap = Some(nsmap);
+        }
+        Rc::get_mut(self.nsmap.as_mut().unwrap()).unwrap()
+    }
+
+    /// Registers a namespace with the internal namespace map.
+    ///
+    /// Note that there is no API to remove namespaces from an element once
+    /// the namespace has been set so be careful with modifying this!
+    ///
+    /// This optionally also registers a specific prefix however if that prefix
+    /// is already used a random one is used instead.
+    pub fn register_namespace(&mut self, url: &str, prefix: Option<&str>) {
+        if self.get_namespace_prefix(url).is_none() {
+            self.get_nsmap_mut().register(prefix, url);
+        }
+    }
+
+    /// Returns the assigned prefix for a namespace.
+    pub fn get_namespace_prefix(&self, url: &str) -> Option<&str> {
+        match url {
+            NS_EMPTY_URI => Some(""),
+            NS_XML_URI => Some("xml"),
+            NS_XMLNS_URI => Some("xmlns"),
+            _ => {
+                if let Some(ref nsmap) = self.nsmap {
+                    nsmap.get_prefix(url)
+                } else {
+                    None
+                }
+            }
+        }
     }
 
     /// Finds the first element that match a given path downwards

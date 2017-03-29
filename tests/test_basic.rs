@@ -73,6 +73,16 @@ fn test_namespaces() {
     assert_eq!(attrs.iter().map(|x| x.as_str()).collect::<Vec<_>>(), vec!["a=1", "b=2", "c=3"]);
 
     assert_eq!(list.attr_count(), 3);
+
+    assert_eq!(root.get_namespace_prefix("http://www.w3.org/2000/xmlns/"), Some("xmlns"));
+
+    assert_eq!(root.get_namespace_prefix("child"), Some("foo"));
+    assert_eq!(root.get_namespace_prefix("root"), Some(""));
+    assert_eq!(root.get_namespace_prefix("missing"), None);
+
+    assert_eq!(list.get_namespace_prefix("child"), Some("foo"));
+    assert_eq!(list.get_namespace_prefix("root"), Some(""));
+    assert_eq!(list.get_namespace_prefix("missing"), None);
 }
 
 #[test]
