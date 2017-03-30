@@ -9,10 +9,17 @@
 //! elementtree = "0"
 //! ```
 //!
-//! ## Usage
+//! ## Reading
+//!
+//! For reading XML you can use the `Element::from_reader` method which will
+//! parse from a given reader.  Afterwards you end up with a fancy element
+//! tree that can be accessed in various different ways.
+//!
+//! You can use ``("ns", "tag")`` or ``{ns}tag`` to refer to fully qualified
+//! elements.
 //!
 //! ```rust
-//! use elementtree::Element;
+//! # use elementtree::Element;
 //! let root = Element::from_reader(r#"<?xml version="1.0"?>
 //! <root xmlns="tag:myns" xmlns:foo="tag:otherns">
 //!     <list a="1" b="2" c="3">
@@ -25,6 +32,34 @@
 //! let list = root.find("{tag:myns}list").unwrap();
 //! for child in list.find_all("{tag:myns}item") {
 //!     println!("attribute: {}", child.get_attr("{tag:otherns}attr").unwrap());
+//! }
+//! ```
+//!
+//! ## Writing
+//!
+//! Writing is easy as well but if you work with namespaces you will need to
+//! register them with the root.  If namespaces are not used yet they will
+//! otherwise be registered with an empty (and once that is used a random prefix)
+//! on the element itself which will blow up the XML size.
+//!
+//! Most methods for modification support chaining in one form or another which
+//! makes modifications slightly more ergonomic.
+//!
+//! ```
+//! # use elementtree::Element;
+//! let ns = "http://example.invalid/#myns";
+//! let other_ns = "http://example.invalid/#otherns";
+//!
+//! let mut root = Element::new((ns, "mydoc"));
+//! root.set_namespace_prefix(other_ns, "other");
+//!
+//! {
+//!     let mut list = root.append_new_child((ns, "list"));
+//!     for x in 0..3 {
+//!         list.append_new_child((ns, "item"))
+//!             .set_text(format!("Item {}", x))
+//!             .set_attr((other_ns, "id"), x.to_string());
+//!     }
 //! }
 //! ```
 //!
@@ -79,7 +114,7 @@ use string_cache::DefaultAtom as Atom;
 use xml::reader::{EventReader, ParserConfig, XmlEvent, Error as XmlReadError,
                   ErrorKind as XmlReadErrorKind};
 use xml::writer::{EventWriter, XmlEvent as XmlWriteEvent, Error as XmlWriteError};
-use xml::common::XmlVersion;
+use xml::common::{XmlVersion, Position as XmlPosition};
 use xml::attribute::{Attribute, OwnedAttribute};
 use xml::name::{Name, OwnedName};
 use xml::namespace::{Namespace as XmlNamespaceMap, NS_EMPTY_URI,
@@ -463,6 +498,11 @@ impl Position {
         }
     }
 
+    fn from_xml_position(pos: &XmlPosition) -> Position {
+        let pos = pos.position();
+        Position::new(pos.row, pos.column)
+    }
+
     /// Returns the line number of the position
     pub fn line(&self) -> u64 {
         self.line
@@ -483,23 +523,30 @@ impl fmt::Display for Position {
 #[derive(Debug)]
 pub enum Error {
     /// The XML is invalid
-    MalformedXml(Cow<'static, str>, Position),
+    MalformedXml {
+        msg: Cow<'static, str>,
+        pos: Position
+    },
     /// An IO Error
     Io(io::Error),
     /// A UTF-8 Error
     Utf8(Utf8Error),
     /// This library is unable to process this XML. This can occur if, for
     /// example, the XML contains processing instructions.
-    UnexpectedEvent,
+    UnexpectedEvent {
+        msg: Cow<'static, str>,
+        pos: Position
+    },
     /// A namespace prefix was already used
     DuplicateNamespacePrefix,
 }
 
 impl Error {
     /// Returns the position of the error if known
-    pub fn position(&self) -> Option<&Position> {
+    pub fn position(&self) -> Option<Position> {
         match self {
-            &Error::MalformedXml(_, ref pos) => Some(pos),
+            &Error::MalformedXml { pos, .. } => Some(pos),
+            &Error::UnexpectedEvent { pos, .. } => Some(pos),
             _ => None,
         }
     }
@@ -518,10 +565,12 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &Error::MalformedXml(ref e, ref pos) => write!(f, "Malformed XML: {} ({})", e, pos),
+            &Error::MalformedXml { ref pos, ref msg } =>
+                write!(f, "Malformed XML: {} ({})", msg, pos),
             &Error::Io(ref e) => write!(f, "{}", e),
             &Error::Utf8(ref e) => write!(f, "{}", e),
-            &Error::UnexpectedEvent => write!(f, "Unexpected XML event"),
+            &Error::UnexpectedEvent { ref msg, .. } =>
+                write!(f, "Unexpected XML event: {}", msg),
             &Error::DuplicateNamespacePrefix => write!(
                 f, "Encountered duplicated namespace prefix"),
         }
@@ -531,10 +580,10 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn description(&self) -> &str {
         match self {
-            &Error::MalformedXml(..) => "Malformed XML",
+            &Error::MalformedXml { .. } => "Malformed XML",
             &Error::Io(..) => "IO error",
             &Error::Utf8(..) => "utf-8 error",
-            &Error::UnexpectedEvent => "Unexpected XML element",
+            &Error::UnexpectedEvent { .. } => "Unexpected XML element",
             &Error::DuplicateNamespacePrefix => "Duplicated namespace prefix",
         }
     }
@@ -559,9 +608,10 @@ impl From<XmlReadError> for Error {
                 io::Error::new(io::ErrorKind::UnexpectedEof,
                                "Encountered unexpected eof")),
             &XmlReadErrorKind::Syntax(ref msg) => {
-                use xml::common::Position as XmlPosition;
-                let pos = err.position();
-                Error::MalformedXml(msg.clone(), Position::new(pos.row, pos.column))
+                Error::MalformedXml {
+                    msg: msg.clone(),
+                    pos: Position::from_xml_position(&err),
+                }
             }
         }
     }
@@ -674,7 +724,10 @@ impl Element {
                 Ok(XmlEvent::ProcessingInstruction { .. }) => {
                     continue;
                 }
-                Ok(_) => return Err(Error::UnexpectedEvent),
+                Ok(_) => return Err(Error::UnexpectedEvent {
+                    msg: Cow::Borrowed("xml construct"),
+                    pos: Position::from_xml_position(&reader),
+                }),
                 Err(e) => return Err(e.into()),
             }
         }
@@ -808,7 +861,10 @@ impl Element {
                        name.namespace.as_ref().map(|x| x.as_str()) == self.tag.ns() {
                         return Ok(());
                     } else {
-                        return Err(Error::UnexpectedEvent);
+                        return Err(Error::UnexpectedEvent {
+                            msg: Cow::Owned(format!("Unexpected end element {}", &name.local_name)),
+                            pos: Position::from_xml_position(reader),
+                        });
                     }
                 }
                 Ok(XmlEvent::StartElement { name, attributes, namespace }) => {
@@ -833,7 +889,10 @@ impl Element {
                     continue;
                 }
                 Ok(_) => {
-                    return Err(Error::UnexpectedEvent);
+                    return Err(Error::UnexpectedEvent {
+                        msg: Cow::Borrowed("unknown element"),
+                        pos: Position::from_xml_position(reader),
+                    })
                 }
                 Err(e) => {
                     return Err(e.into());
