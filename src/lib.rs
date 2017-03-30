@@ -67,6 +67,7 @@ use std::io::{Read, Write};
 use std::io;
 use std::fmt;
 use std::mem;
+use std::str::Utf8Error;
 use std::ops::Deref;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
@@ -75,7 +76,8 @@ use std::rc::Rc;
 
 use string_cache::DefaultAtom as Atom;
 
-use xml::reader::{EventReader, ParserConfig, XmlEvent};
+use xml::reader::{EventReader, ParserConfig, XmlEvent, Error as XmlReadError,
+                  ErrorKind as XmlReadErrorKind};
 use xml::writer::{EventWriter, XmlEvent as XmlWriteEvent, Error as XmlWriteError};
 use xml::common::XmlVersion;
 use xml::attribute::{Attribute, OwnedAttribute};
@@ -445,13 +447,47 @@ pub struct FindChildren<'a> {
     child_iter: Children<'a>,
 }
 
+/// Represents a position in the source.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+pub struct Position {
+    line: u64,
+    column: u64
+}
+
+impl Position {
+    /// Creates a new position.
+    pub fn new(line: u64, column: u64) -> Position {
+        Position {
+            line: line,
+            column: column,
+        }
+    }
+
+    /// Returns the line number of the position
+    pub fn line(&self) -> u64 {
+        self.line
+    }
+    /// Returns the column of the position
+    pub fn column(&self) -> u64 {
+        self.column
+    }
+}
+
+impl fmt::Display for Position {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}:{}", self.line, self.column)
+    }
+}
+
 /// Errors that can occur parsing XML
 #[derive(Debug)]
 pub enum Error {
     /// The XML is invalid
-    MalformedXml(xml::reader::Error),
+    MalformedXml(Cow<'static, str>, Position),
     /// An IO Error
     Io(io::Error),
+    /// A UTF-8 Error
+    Utf8(Utf8Error),
     /// This library is unable to process this XML. This can occur if, for
     /// example, the XML contains processing instructions.
     UnexpectedEvent,
@@ -459,11 +495,32 @@ pub enum Error {
     DuplicateNamespacePrefix,
 }
 
+impl Error {
+    /// Returns the position of the error if known
+    pub fn position(&self) -> Option<&Position> {
+        match self {
+            &Error::MalformedXml(_, ref pos) => Some(pos),
+            _ => None,
+        }
+    }
+
+    /// Returns the line number of the error or 0 if unknown
+    pub fn line(&self) -> u64 {
+        self.position().map(|x| x.line()).unwrap_or(0)
+    }
+
+    /// Returns the column of the error or 0 if unknown
+    pub fn column(&self) -> u64 {
+        self.position().map(|x| x.column()).unwrap_or(0)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &Error::MalformedXml(ref e) => write!(f, "Malformed XML. {}", e),
+            &Error::MalformedXml(ref e, ref pos) => write!(f, "Malformed XML: {} ({})", e, pos),
             &Error::Io(ref e) => write!(f, "{}", e),
+            &Error::Utf8(ref e) => write!(f, "{}", e),
             &Error::UnexpectedEvent => write!(f, "Unexpected XML event"),
             &Error::DuplicateNamespacePrefix => write!(
                 f, "Encountered duplicated namespace prefix"),
@@ -476,6 +533,7 @@ impl std::error::Error for Error {
         match self {
             &Error::MalformedXml(..) => "Malformed XML",
             &Error::Io(..) => "IO error",
+            &Error::Utf8(..) => "utf-8 error",
             &Error::UnexpectedEvent => "Unexpected XML element",
             &Error::DuplicateNamespacePrefix => "Duplicated namespace prefix",
         }
@@ -483,9 +541,28 @@ impl std::error::Error for Error {
 
     fn cause(&self) -> Option<&std::error::Error> {
         match self {
-            &Error::MalformedXml(ref e) => Some(e),
             &Error::Io(ref e) => Some(e),
+            &Error::Utf8(ref e) => Some(e),
             _ => None,
+        }
+    }
+}
+
+impl From<XmlReadError> for Error {
+    fn from(err: XmlReadError) -> Error {
+        use std::error::Error as StdError;
+        match err.kind() {
+            &XmlReadErrorKind::Io(ref err) => Error::Io(
+                io::Error::new(err.kind(), err.description())),
+            &XmlReadErrorKind::Utf8(ref err) => Error::Utf8(err.clone()),
+            &XmlReadErrorKind::UnexpectedEof => Error::Io(
+                io::Error::new(io::ErrorKind::UnexpectedEof,
+                               "Encountered unexpected eof")),
+            &XmlReadErrorKind::Syntax(ref msg) => {
+                use xml::common::Position as XmlPosition;
+                let pos = err.position();
+                Error::MalformedXml(msg.clone(), Position::new(pos.row, pos.column))
+            }
         }
     }
 }
@@ -598,7 +675,7 @@ impl Element {
                     continue;
                 }
                 Ok(_) => return Err(Error::UnexpectedEvent),
-                Err(e) => return Err(Error::MalformedXml(e)),
+                Err(e) => return Err(e.into()),
             }
         }
     }
@@ -759,7 +836,7 @@ impl Element {
                     return Err(Error::UnexpectedEvent);
                 }
                 Err(e) => {
-                    return Err(Error::MalformedXml(e));
+                    return Err(e.into());
                 }
             }
         }
@@ -857,7 +934,7 @@ impl Element {
     /// ```
     /// use elementtree::Element;
     ///
-    /// let ns = "http://example.invalid/#ns"
+    /// let ns = "http://example.invalid/#ns";
     /// let mut root = Element::new((ns, "mydoc"));
     ///
     /// {
