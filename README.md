@@ -1,5 +1,5 @@
-elementtree-rs
-==============
+ElementTree for Rust
+====================
 
 [API Documentation](https://docs.rs/elementtree/)
 
