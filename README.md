@@ -1,6 +1,8 @@
 elementtree-rs
 ==============
 
+[API Documentation](https://docs.rs/elementtree/)
+
 This library parses XML into a Python ElementTree like structure.  It currently
 only supports reading but for that it has pretty good namespace support and the
 ability to inspect the file.
