@@ -284,3 +284,25 @@ fn test_creation_with_no_xml_prolog_defined() {
             </list>\
         </mydoc>");
 }
+
+#[test]
+fn test_render_multiple_times() {
+    let mut root = Element::new("{demo}mydoc");
+    root.set_namespace_prefix("demo", "").unwrap();
+    root.set_attr(("demo", "id"), "some_id".to_string())
+        .set_attr(("demo", "name"), "some_name".to_string())
+        .set_attr(("demo", "some-other-attr"), "other_attr".to_string());
+
+    let mut out:Vec<u8> = Vec::new();
+
+    root.to_writer_with_options(&mut out, WriteOptions::new()).unwrap();
+    assert_eq!(str::from_utf8(&out).unwrap(), "\
+        <?xml version=\"1.0\" encoding=\"utf-8\"?>\
+        <mydoc xmlns=\"demo\" id=\"some_id\" name=\"some_name\" some-other-attr=\"other_attr\" />");
+
+    let mut out2:Vec<u8> = Vec::new();
+    root.to_writer_with_options(&mut out2, WriteOptions::new()).unwrap();
+    assert_eq!(str::from_utf8(&out2).unwrap(), "\
+        <?xml version=\"1.0\" encoding=\"utf-8\"?>\
+        <mydoc xmlns=\"demo\" id=\"some_id\" name=\"some_name\" some-other-attr=\"other_attr\" />");
+}

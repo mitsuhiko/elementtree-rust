@@ -96,8 +96,9 @@
 extern crate xml;
 extern crate string_cache;
 
-use std::collections::{HashMap, BTreeMap};
-use std::collections::hash_map::Iter as HashMapIter;
+use std::cmp::Ord;
+use std::collections::BTreeMap;
+use std::collections::btree_map::Iter as BTreeMapIter;
 use std::io::{Read, Write};
 use std::io;
 use std::fmt;
@@ -352,6 +353,18 @@ impl<'a> Hash for QName<'a> {
     }
 }
 
+impl<'a> PartialOrd for QName<'a> {
+    fn partial_cmp(&self, other: &QName<'a>) -> Option<Ordering> {
+        self.name().partial_cmp(other.name())
+    }
+}
+
+impl<'a> Ord for QName<'a> {
+    fn cmp(&self, other: &QName<'a>) -> Ordering {
+        self.name().cmp(other.name())
+    }
+}
+
 #[derive(Debug, Clone)]
 struct NamespaceMap {
     prefix_to_ns: BTreeMap<XmlAtom<'static>, XmlAtom<'static>>,
@@ -458,7 +471,7 @@ impl NamespaceMap {
 #[derive(Debug, Clone)]
 pub struct Element {
     tag: QName<'static>,
-    attributes: HashMap<QName<'static>, String>,
+    attributes: BTreeMap<QName<'static>, String>,
     children: Vec<Element>,
     nsmap: Option<Rc<NamespaceMap>>,
     emit_nsmap: bool,
@@ -474,7 +487,7 @@ pub struct Children<'a> {
 
 /// An iterator over attributes of an element.
 pub struct Attrs<'a> {
-    iter: HashMapIter<'a, QName<'a>, String>,
+    iter: BTreeMapIter<'a, QName<'a>, String>,
 }
 
 /// An iterator over matching children.
@@ -694,7 +707,7 @@ impl Element {
     fn new_with_nsmap<'a>(tag: &QName<'a>, nsmap: Option<Rc<NamespaceMap>>) -> Element {
         let mut rv = Element {
             tag: tag.share(),
-            attributes: HashMap::new(),
+            attributes: BTreeMap::new(),
             nsmap: nsmap,
             emit_nsmap: false,
             children: vec![],
@@ -854,7 +867,7 @@ impl Element {
     {
         let mut root = Element {
             tag: QName::from_owned_name(name),
-            attributes: HashMap::new(),
+            attributes: BTreeMap::new(),
             nsmap: parent_nsmap,
             emit_nsmap: false,
             children: vec![],
@@ -1087,9 +1100,9 @@ impl Element {
         // move the internal string storage into a global string cache or we are
         // pointing to static memory in the binary.
         //
-        // However while Rust can coerce our HashMap from QName<'static> to
+        // However while Rust can coerce our BTreeMap from QName<'static> to
         // QName<'a> when reading, we can't do the same when writing.  This is
-        // to prevent us from stashing a QName<'a> into the hashmap.  However on
+        // to prevent us from stashing a QName<'a> into the btreemap.  However on
         // remove that restriction makes no sense so we can unsafely transmute it
         // away.  I wish there was a better way though.
         use std::borrow::Borrow;
