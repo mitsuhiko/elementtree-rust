@@ -119,6 +119,7 @@ use xml::attribute::{Attribute, OwnedAttribute};
 use xml::name::{Name, OwnedName};
 use xml::namespace::{Namespace as XmlNamespaceMap, NS_EMPTY_URI,
                      NS_XMLNS_URI, NS_XML_URI};
+use xml::EmitterConfig;
 
 enum XmlAtom<'a> {
     Shared(Atom),
@@ -462,7 +463,7 @@ pub struct Element {
     nsmap: Option<Rc<NamespaceMap>>,
     emit_nsmap: bool,
     text: Option<String>,
-    tail: Option<String>,
+    tail: Option<String>
 }
 
 /// An iterator over children of an element.
@@ -745,12 +746,36 @@ impl Element {
     /// this information automatically in the absence of DTD support which
     /// is not really planned.
     pub fn to_writer<W: Write>(&self, w: W) -> Result<(), Error> {
-        let mut writer = EventWriter::new(w);
-        writer.write(XmlWriteEvent::StartDocument {
-            version: XmlVersion::Version10,
-            encoding: Some("utf-8"),
-            standalone: None,
-        })?;
+        self.to_writer_with_options(w, WriteOptions::new())
+    }
+
+    /// Dump an element as XML document into a writer with option.
+    ///
+    /// This will create an XML document with a processing instruction
+    /// to start it.  There is currently no API to only serialize a non
+    /// standalone element.
+    ///
+    /// Currently the writer has no way to customize what is generated
+    /// in particular there is no support yet for automatically indenting
+    /// elements.  The reason for this is that there is no way to ignore
+    /// this information automatically in the absence of DTD support which
+    /// is not really planned.
+    pub fn to_writer_with_options<W: Write>(&self, w: W, options: WriteOptions) -> Result<(), Error> {
+        let mut writer = EmitterConfig::new()
+            .write_document_declaration(options.xml_prolog.is_some())
+            .create_writer(w);
+
+        if options.xml_prolog.is_some() {
+            writer.write(XmlWriteEvent::StartDocument {
+                version: match options.xml_prolog.unwrap() {
+                    XmlProlog::Version10 => XmlVersion::Version10,
+                    XmlProlog::Version11 => XmlVersion::Version11,
+                },
+                encoding: Some("utf-8"),
+                standalone: None,
+            })?;
+        }
+
         self.dump_into_writer(&mut writer)
     }
 
@@ -1160,5 +1185,43 @@ impl Element {
         }
 
         Some(node)
+    }
+}
+
+/// Xml Prolog version handle by elementtree
+pub enum XmlProlog {
+    Version10,
+    Version11,
+}
+
+/// A struct that define write options.
+pub struct WriteOptions {
+    xml_prolog: Option<XmlProlog>
+}
+
+impl Default for WriteOptions {
+    fn default() -> WriteOptions {
+        WriteOptions {
+            xml_prolog: Some(XmlProlog::Version10)
+        }
+    }
+}
+
+impl WriteOptions {
+    pub fn new() -> WriteOptions {
+        WriteOptions {
+            ..WriteOptions::default()
+        }
+    }
+
+    /// Define which xml prolog will be displayed when rendering an Element.
+    ///
+    /// Note that prolog is optional, an XML document with a missing prolog is well-formed but not valid.
+    ///
+    /// See RFC: [W3C XML 26 November 2008](https://www.w3.org/TR/xml/#sec-prolog-dtd)
+    pub fn set_xml_prolog(mut self, prolog: Option<XmlProlog>) -> Self {
+        self.xml_prolog = prolog;
+
+        self
     }
 }

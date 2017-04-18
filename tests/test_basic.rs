@@ -1,6 +1,6 @@
 extern crate elementtree;
-
-use elementtree::{Element, QName};
+use std::str;
+use elementtree::{Element, QName, WriteOptions, XmlProlog};
 
 
 #[test]
@@ -172,4 +172,115 @@ fn test_whitespace() {
 
     let items: Vec<_> = list.children().map(|x| x.text()).collect();
     assert_eq!(items.as_slice(), &[" Item 1 ", " Item 2 ", " Item 3 "]);
+}
+
+
+#[test]
+fn test_creation_without_xml_declaration() {
+    let mut root = Element::new("{demo}mydoc");
+    root.set_namespace_prefix("demo", "").unwrap();
+    {
+        let mut list = root.append_new_child("{demo}list");
+        for x in 0..3 {
+            let mut child = list.append_new_child("{demo}item");
+            child.set_text(format!("Item {}", x));
+        }
+    }
+
+    let mut out:Vec<u8> = Vec::new();
+    let options = WriteOptions::new()
+        .set_xml_prolog(None);
+
+    root.to_writer_with_options(&mut out, options).unwrap();
+    assert_eq!(str::from_utf8(&out).unwrap(), "\
+        <mydoc xmlns=\"demo\">\
+            <list>\
+                <item>Item 0</item>\
+                <item>Item 1</item>\
+                <item>Item 2</item>\
+            </list>\
+        </mydoc>");
+}
+
+#[test]
+fn test_creation_with_xml_prolog_10() {
+    let mut root = Element::new("{demo}mydoc");
+    root.set_namespace_prefix("demo", "").unwrap();
+    {
+        let mut list = root.append_new_child("{demo}list");
+        for x in 0..3 {
+            let mut child = list.append_new_child("{demo}item");
+            child.set_text(format!("Item {}", x));
+        }
+    }
+
+    let mut out:Vec<u8> = Vec::new();
+    let options = WriteOptions::new()
+        .set_xml_prolog(Some(XmlProlog::Version10));
+
+    root.to_writer_with_options(&mut out, options).unwrap();
+    assert_eq!(str::from_utf8(&out).unwrap(), "\
+        <?xml version=\"1.0\" encoding=\"utf-8\"?>\
+        <mydoc xmlns=\"demo\">\
+            <list>\
+                <item>Item 0</item>\
+                <item>Item 1</item>\
+                <item>Item 2</item>\
+            </list>\
+        </mydoc>");
+}
+
+#[test]
+fn test_creation_with_xml_prolog_11() {
+    let mut root = Element::new("{demo}mydoc");
+    root.set_namespace_prefix("demo", "").unwrap();
+    {
+        let mut list = root.append_new_child("{demo}list");
+        for x in 0..3 {
+            let mut child = list.append_new_child("{demo}item");
+            child.set_text(format!("Item {}", x));
+        }
+    }
+
+    let mut out:Vec<u8> = Vec::new();
+    let options = WriteOptions::new()
+        .set_xml_prolog(Some(XmlProlog::Version11));
+
+    root.to_writer_with_options(&mut out, options).unwrap();
+    assert_eq!(str::from_utf8(&out).unwrap(), "\
+        <?xml version=\"1.1\" encoding=\"utf-8\"?>\
+        <mydoc xmlns=\"demo\">\
+            <list>\
+                <item>Item 0</item>\
+                <item>Item 1</item>\
+                <item>Item 2</item>\
+            </list>\
+        </mydoc>");
+}
+
+#[test]
+fn test_creation_with_no_xml_prolog_defined() {
+    let mut root = Element::new("{demo}mydoc");
+    root.set_namespace_prefix("demo", "").unwrap();
+    {
+        let mut list = root.append_new_child("{demo}list");
+        for x in 0..3 {
+            let mut child = list.append_new_child("{demo}item");
+            child.set_text(format!("Item {}", x));
+        }
+    }
+
+    let mut out:Vec<u8> = Vec::new();
+    let options = WriteOptions::new();
+
+    root.to_writer_with_options(&mut out, options).unwrap();
+    assert_eq!(str::from_utf8(&out).unwrap(), "\
+        <?xml version=\"1.0\" encoding=\"utf-8\"?>\
+        <mydoc xmlns=\"demo\">\
+            <list>\
+                <item>Item 0</item>\
+                <item>Item 1</item>\
+                <item>Item 2</item>\
+            </list>\
+        </mydoc>");
 }
