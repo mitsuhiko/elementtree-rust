@@ -366,7 +366,7 @@ impl<'a> Ord for QName<'a> {
 }
 
 #[derive(Debug, Clone)]
-struct NamespaceMap {
+pub struct NamespaceMap {
     prefix_to_ns: BTreeMap<XmlAtom<'static>, XmlAtom<'static>>,
     ns_to_prefix: BTreeMap<XmlAtom<'static>, XmlAtom<'static>>,
 }
@@ -858,7 +858,7 @@ impl Element {
         Ok(())
     }
 
-    fn from_start_element<R: Read>(name: OwnedName,
+    pub fn from_start_element<R: Read>(name: OwnedName,
                                    attributes: Vec<OwnedAttribute>,
                                    namespace: XmlNamespaceMap,
                                    parent_nsmap: Option<Rc<NamespaceMap>>,
