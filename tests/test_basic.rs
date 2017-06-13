@@ -306,3 +306,26 @@ fn test_render_multiple_times() {
         <?xml version=\"1.0\" encoding=\"utf-8\"?>\
         <mydoc xmlns=\"demo\" id=\"some_id\" name=\"some_name\" some-other-attr=\"other_attr\" />");
 }
+
+#[test]
+fn test_mut_finding() {
+    let mut root = Element::from_reader(r#"<?xml version="1.0"?>
+    <root>
+        <list>
+            <item> Item 1 </item>Tail 1
+            <item> Item 2 </item>Tail 2
+            <item> Item 3 </item>Tail 3
+        </list>
+    </root>
+    "#.as_bytes()).unwrap();
+
+    {
+        let mut list = root.find_mut("list").unwrap();
+        for item in list.find_all_mut("item") {
+            item.set_text("wat");
+        }
+    }
+
+    let v: Vec<_> = root.find("list").unwrap().find_all("item").map(|x| x.text()).collect();
+    assert_eq!(&v, &["wat", "wat", "wat"]);
+}

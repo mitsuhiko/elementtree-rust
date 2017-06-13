@@ -485,6 +485,11 @@ pub struct Children<'a> {
     element: &'a Element,
 }
 
+/// A mutable iterator over children of an element.
+pub struct ChildrenMut<'a> {
+    iter: ::std::slice::IterMut<'a, Element>,
+}
+
 /// An iterator over attributes of an element.
 pub struct Attrs<'a> {
     iter: BTreeMapIter<'a, QName<'a>, String>,
@@ -494,6 +499,12 @@ pub struct Attrs<'a> {
 pub struct FindChildren<'a> {
     tag: Cow<'a, QName<'a>>,
     child_iter: Children<'a>,
+}
+
+/// A mutable iterator over matching children.
+pub struct FindChildrenMut<'a> {
+    tag: Cow<'a, QName<'a>>,
+    child_iter: ChildrenMut<'a>,
 }
 
 /// Represents a position in the source.
@@ -654,6 +665,14 @@ impl<'a> Iterator for Children<'a> {
     }
 }
 
+impl<'a> Iterator for ChildrenMut<'a> {
+    type Item = &'a mut Element;
+
+    fn next(&mut self) -> Option<&'a mut Element> {
+        self.iter.next()
+    }
+}
+
 impl<'a> Iterator for Attrs<'a> {
     type Item = (&'a QName<'a>, &'a str);
 
@@ -680,6 +699,16 @@ impl<'a> Iterator for FindChildren<'a> {
                 return None;
             }
         }
+    }
+}
+
+impl<'a> Iterator for FindChildrenMut<'a> {
+    type Item = &'a mut Element;
+
+    fn next(&mut self) -> Option<&'a mut Element> {
+        use std::borrow::Borrow;
+        let tag: &QName = &self.tag.borrow();
+        self.child_iter.find(|x| x.tag() == tag)
     }
 }
 
@@ -1056,12 +1085,28 @@ impl Element {
         }
     }
 
+    /// Returns a mutable iterator over all children.
+    pub fn children_mut<'a>(&'a mut self) -> ChildrenMut<'a> {
+        ChildrenMut {
+            iter: self.children.iter_mut(),
+        }
+    }
+
     /// Returns all children with the given name.
     pub fn find_all<'a, Q: AsQName<'a>>(&'a self, tag: Q) -> FindChildren<'a>
     {
         FindChildren {
             tag: tag.as_qname(),
             child_iter: self.children(),
+        }
+    }
+
+    /// Returns all children with the given name.
+    pub fn find_all_mut<'a, Q: AsQName<'a>>(&'a mut self, tag: Q) -> FindChildrenMut<'a>
+    {
+        FindChildrenMut {
+            tag: tag.as_qname(),
+            child_iter: self.children_mut(),
         }
     }
 
@@ -1076,6 +1121,11 @@ impl Element {
             }
         }
         None
+    }
+
+    /// Finds the first matching child and returns a mut ref
+    pub fn find_mut<'a, Q: AsQName<'a>>(&'a mut self, tag: Q) -> Option<&'a mut Element> {
+        self.find_all_mut(tag).next()
     }
 
     /// Look up an attribute by qualified name.
