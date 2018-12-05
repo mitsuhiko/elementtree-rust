@@ -79,7 +79,7 @@
 //!     for most situations just working with the `text` is what you want and
 //!     you can ignore the existence of the `tail`.
 //! *   tags and attributes are implemented through a `QName` abstraction that
-//!     simplifies working wiht namespaces.  Most APIs just accept strings and
+//!     simplifies working with namespaces.  Most APIs just accept strings and
 //!     will create `QName`s automatically.
 //! *   namespace prefixes never play a role and are in fact not really exposed.
 //!     Instead all namespaces are managed through their canonical identifier.
