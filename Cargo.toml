@@ -11,5 +11,5 @@ readme = "README.md"
 edition = "2018"
 
 [dependencies]
-xml-rs = "0"
-string_cache = "0"
+xml-rs = "0.8"
+string_cache = "0.8"
