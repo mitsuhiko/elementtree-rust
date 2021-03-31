@@ -93,33 +93,30 @@
 //! copied and the writer will emit them accordingly.
 //!
 //! Namespaces need to be registered or the XML generated will be malformed.
-extern crate xml;
-extern crate string_cache;
-
-use std::cmp::Ord;
-use std::collections::BTreeMap;
-use std::collections::btree_map::Iter as BTreeMapIter;
-use std::io::{Read, Write};
-use std::io;
-use std::fmt;
-use std::mem;
-use std::str::Utf8Error;
-use std::ops::Deref;
-use std::cmp::Ordering;
-use std::hash::{Hash, Hasher};
 use std::borrow::Cow;
+use std::cmp::Ord;
+use std::cmp::Ordering;
+use std::collections::btree_map::Iter as BTreeMapIter;
+use std::collections::BTreeMap;
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::io;
+use std::io::{Read, Write};
+use std::mem;
+use std::ops::Deref;
 use std::rc::Rc;
+use std::str::Utf8Error;
 
 use string_cache::DefaultAtom as Atom;
 
-use xml::reader::{EventReader, ParserConfig, XmlEvent, Error as XmlReadError,
-                  ErrorKind as XmlReadErrorKind};
-use xml::writer::{EventWriter, XmlEvent as XmlWriteEvent, Error as XmlWriteError};
-use xml::common::{XmlVersion, Position as XmlPosition};
 use xml::attribute::{Attribute, OwnedAttribute};
+use xml::common::{Position as XmlPosition, XmlVersion};
 use xml::name::{Name, OwnedName};
-use xml::namespace::{Namespace as XmlNamespaceMap, NS_EMPTY_URI,
-                     NS_XMLNS_URI, NS_XML_URI};
+use xml::namespace::{Namespace as XmlNamespaceMap, NS_EMPTY_URI, NS_XMLNS_URI, NS_XML_URI};
+use xml::reader::{
+    Error as XmlReadError, ErrorKind as XmlReadErrorKind, EventReader, ParserConfig, XmlEvent,
+};
+use xml::writer::{Error as XmlWriteError, EventWriter, XmlEvent as XmlWriteEvent};
 use xml::EmitterConfig;
 
 enum XmlAtom<'a> {
@@ -300,7 +297,10 @@ impl<'a> QName<'a> {
     pub fn share(&self) -> QName<'static> {
         QName {
             name: XmlAtom::Shared(Atom::from(self.name.borrow())),
-            ns: self.ns.as_ref().map(|x| XmlAtom::Shared(Atom::from(x.borrow()))),
+            ns: self
+                .ns
+                .as_ref()
+                .map(|x| XmlAtom::Shared(Atom::from(x.borrow()))),
         }
     }
 
@@ -314,16 +314,16 @@ impl<'a> QName<'a> {
                     } else {
                         None
                     }
-                },
+                }
                 _ => None,
-            }
+            },
         }
     }
 }
 
 impl<'a> PartialEq for QName<'a> {
     fn eq(&self, other: &QName<'a>) -> bool {
-         self.name() == other.name() && self.ns() == other.ns()
+        self.name() == other.name() && self.ns() == other.ns()
     }
 }
 
@@ -407,7 +407,10 @@ impl NamespaceMap {
         let mut i = 1;
         loop {
             let random_prefix = format!("ns{}", i);
-            if !self.prefix_to_ns.contains_key(&XmlAtom::Borrowed(&random_prefix)) {
+            if !self
+                .prefix_to_ns
+                .contains_key(&XmlAtom::Borrowed(&random_prefix))
+            {
                 return XmlAtom::Shared(Atom::from(random_prefix));
             }
             i += 1;
@@ -476,7 +479,7 @@ pub struct Element {
     nsmap: Option<Rc<NamespaceMap>>,
     emit_nsmap: bool,
     text: Option<String>,
-    tail: Option<String>
+    tail: Option<String>,
 }
 
 /// An iterator over children of an element.
@@ -511,7 +514,7 @@ pub struct FindChildrenMut<'a> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Position {
     line: u64,
-    column: u64
+    column: u64,
 }
 
 impl Position {
@@ -523,7 +526,7 @@ impl Position {
         }
     }
 
-    fn from_xml_position(pos: &XmlPosition) -> Position {
+    fn from_xml_position(pos: &dyn XmlPosition) -> Position {
         let pos = pos.position();
         Position::new(pos.row, pos.column)
     }
@@ -550,7 +553,7 @@ pub enum Error {
     /// The XML is invalid
     MalformedXml {
         msg: Cow<'static, str>,
-        pos: Position
+        pos: Position,
     },
     /// An IO Error
     Io(io::Error),
@@ -560,7 +563,7 @@ pub enum Error {
     /// example, the XML contains processing instructions.
     UnexpectedEvent {
         msg: Cow<'static, str>,
-        pos: Position
+        pos: Position,
     },
     /// A namespace prefix was already used
     DuplicateNamespacePrefix,
@@ -590,30 +593,21 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &Error::MalformedXml { ref pos, ref msg } =>
-                write!(f, "Malformed XML: {} ({})", msg, pos),
+            &Error::MalformedXml { ref pos, ref msg } => {
+                write!(f, "Malformed XML: {} ({})", msg, pos)
+            }
             &Error::Io(ref e) => write!(f, "{}", e),
             &Error::Utf8(ref e) => write!(f, "{}", e),
-            &Error::UnexpectedEvent { ref msg, .. } =>
-                write!(f, "Unexpected XML event: {}", msg),
-            &Error::DuplicateNamespacePrefix => write!(
-                f, "Encountered duplicated namespace prefix"),
+            &Error::UnexpectedEvent { ref msg, .. } => write!(f, "Unexpected XML event: {}", msg),
+            &Error::DuplicateNamespacePrefix => {
+                write!(f, "Encountered duplicated namespace prefix")
+            }
         }
     }
 }
 
 impl std::error::Error for Error {
-    fn description(&self) -> &str {
-        match self {
-            &Error::MalformedXml { .. } => "Malformed XML",
-            &Error::Io(..) => "IO error",
-            &Error::Utf8(..) => "utf-8 error",
-            &Error::UnexpectedEvent { .. } => "Unexpected XML element",
-            &Error::DuplicateNamespacePrefix => "Duplicated namespace prefix",
-        }
-    }
-
-    fn cause(&self) -> Option<&std::error::Error> {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
         match self {
             &Error::Io(ref e) => Some(e),
             &Error::Utf8(ref e) => Some(e),
@@ -624,20 +618,19 @@ impl std::error::Error for Error {
 
 impl From<XmlReadError> for Error {
     fn from(err: XmlReadError) -> Error {
-        use std::error::Error as StdError;
         match err.kind() {
-            &XmlReadErrorKind::Io(ref err) => Error::Io(
-                io::Error::new(err.kind(), err.description())),
-            &XmlReadErrorKind::Utf8(ref err) => Error::Utf8(err.clone()),
-            &XmlReadErrorKind::UnexpectedEof => Error::Io(
-                io::Error::new(io::ErrorKind::UnexpectedEof,
-                               "Encountered unexpected eof")),
-            &XmlReadErrorKind::Syntax(ref msg) => {
-                Error::MalformedXml {
-                    msg: msg.clone(),
-                    pos: Position::from_xml_position(&err),
-                }
+            &XmlReadErrorKind::Io(ref err) => {
+                Error::Io(io::Error::new(err.kind(), err.to_string()))
             }
+            &XmlReadErrorKind::Utf8(ref err) => Error::Utf8(err.clone()),
+            &XmlReadErrorKind::UnexpectedEof => Error::Io(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "Encountered unexpected eof",
+            )),
+            &XmlReadErrorKind::Syntax(ref msg) => Error::MalformedXml {
+                msg: msg.clone(),
+                pos: Position::from_xml_position(&err),
+            },
         }
     }
 }
@@ -646,7 +639,9 @@ impl From<XmlWriteError> for Error {
     fn from(err: XmlWriteError) -> Error {
         match err {
             XmlWriteError::Io(err) => Error::Io(err),
-            err => { return Err(err).unwrap(); }
+            err => {
+                return Err(err).unwrap();
+            }
         }
     }
 }
@@ -752,25 +747,35 @@ impl Element {
 
     /// Parses some XML data into an `Element` from a reader.
     pub fn from_reader<R: Read>(r: R) -> Result<Element, Error> {
-        let cfg = ParserConfig::new()
-            .whitespace_to_characters(true);
+        let cfg = ParserConfig::new().whitespace_to_characters(true);
         let mut reader = cfg.create_reader(r);
         loop {
             match reader.next() {
-                Ok(XmlEvent::StartElement { name, attributes, namespace }) => {
+                Ok(XmlEvent::StartElement {
+                    name,
+                    attributes,
+                    namespace,
+                }) => {
                     return Element::from_start_element(
-                        name, attributes, namespace, None, &mut reader);
+                        name,
+                        attributes,
+                        namespace,
+                        None,
+                        &mut reader,
+                    );
                 }
-                Ok(XmlEvent::Comment(..)) |
-                Ok(XmlEvent::Whitespace(..)) |
-                Ok(XmlEvent::StartDocument { .. }) |
-                Ok(XmlEvent::ProcessingInstruction { .. }) => {
+                Ok(XmlEvent::Comment(..))
+                | Ok(XmlEvent::Whitespace(..))
+                | Ok(XmlEvent::StartDocument { .. })
+                | Ok(XmlEvent::ProcessingInstruction { .. }) => {
                     continue;
                 }
-                Ok(_) => return Err(Error::UnexpectedEvent {
-                    msg: Cow::Borrowed("xml construct"),
-                    pos: Position::from_xml_position(&reader),
-                }),
+                Ok(_) => {
+                    return Err(Error::UnexpectedEvent {
+                        msg: Cow::Borrowed("xml construct"),
+                        pos: Position::from_xml_position(&reader),
+                    })
+                }
                 Err(e) => return Err(e.into()),
             }
         }
@@ -802,7 +807,11 @@ impl Element {
     /// elements.  The reason for this is that there is no way to ignore
     /// this information automatically in the absence of DTD support which
     /// is not really planned.
-    pub fn to_writer_with_options<W: Write>(&self, w: W, options: WriteOptions) -> Result<(), Error> {
+    pub fn to_writer_with_options<W: Write>(
+        &self,
+        w: W,
+        options: WriteOptions,
+    ) -> Result<(), Error> {
         let mut writer = EmitterConfig::new()
             .write_document_declaration(options.xml_prolog.is_some())
             .create_writer(w);
@@ -880,20 +889,18 @@ impl Element {
             }
         }
 
-        w.write(XmlWriteEvent::EndElement {
-            name: Some(name),
-        })?;
+        w.write(XmlWriteEvent::EndElement { name: Some(name) })?;
 
         Ok(())
     }
 
-    fn from_start_element<R: Read>(name: OwnedName,
-                                   attributes: Vec<OwnedAttribute>,
-                                   namespace: XmlNamespaceMap,
-                                   parent_nsmap: Option<Rc<NamespaceMap>>,
-                                   reader: &mut EventReader<R>)
-        -> Result<Element, Error>
-    {
+    fn from_start_element<R: Read>(
+        name: OwnedName,
+        attributes: Vec<OwnedAttribute>,
+        namespace: XmlNamespaceMap,
+        parent_nsmap: Option<Rc<NamespaceMap>>,
+        reader: &mut EventReader<R>,
+    ) -> Result<Element, Error> {
         let mut root = Element {
             tag: QName::from_owned_name(name),
             attributes: BTreeMap::new(),
@@ -904,7 +911,8 @@ impl Element {
             tail: None,
         };
         for attr in attributes {
-            root.attributes.insert(QName::from_owned_name(attr.name), attr.value);
+            root.attributes
+                .insert(QName::from_owned_name(attr.name), attr.value);
         }
 
         if !namespace.is_essentially_empty() {
@@ -917,15 +925,13 @@ impl Element {
         Ok(root)
     }
 
-    fn parse_children<R: Read>(&mut self,
-                               reader: &mut EventReader<R>)
-        -> Result<(), Error>
-    {
+    fn parse_children<R: Read>(&mut self, reader: &mut EventReader<R>) -> Result<(), Error> {
         loop {
             match reader.next() {
                 Ok(XmlEvent::EndElement { ref name }) => {
-                    if &name.local_name == self.tag.name() &&
-                       name.namespace.as_ref().map(|x| x.as_str()) == self.tag.ns() {
+                    if &name.local_name == self.tag.name()
+                        && name.namespace.as_ref().map(|x| x.as_str()) == self.tag.ns()
+                    {
                         return Ok(());
                     } else {
                         return Err(Error::UnexpectedEvent {
@@ -934,9 +940,18 @@ impl Element {
                         });
                     }
                 }
-                Ok(XmlEvent::StartElement { name, attributes, namespace }) => {
+                Ok(XmlEvent::StartElement {
+                    name,
+                    attributes,
+                    namespace,
+                }) => {
                     self.children.push(Element::from_start_element(
-                        name, attributes, namespace, self.nsmap.clone(), reader)?);
+                        name,
+                        attributes,
+                        namespace,
+                        self.nsmap.clone(),
+                        reader,
+                    )?);
                 }
                 Ok(XmlEvent::Characters(s)) => {
                     let child_count = self.children.len();
@@ -949,10 +964,10 @@ impl Element {
                 Ok(XmlEvent::CData(s)) => {
                     self.text = Some(s);
                 }
-                Ok(XmlEvent::Comment(..)) |
-                Ok(XmlEvent::Whitespace(..)) |
-                Ok(XmlEvent::StartDocument { .. }) |
-                Ok(XmlEvent::ProcessingInstruction { .. }) => {
+                Ok(XmlEvent::Comment(..))
+                | Ok(XmlEvent::Whitespace(..))
+                | Ok(XmlEvent::StartDocument { .. })
+                | Ok(XmlEvent::ProcessingInstruction { .. }) => {
                     continue;
                 }
                 Ok(_) => {
@@ -1093,8 +1108,7 @@ impl Element {
     }
 
     /// Returns all children with the given name.
-    pub fn find_all<'a, Q: AsQName<'a>>(&'a self, tag: Q) -> FindChildren<'a>
-    {
+    pub fn find_all<'a, Q: AsQName<'a>>(&'a self, tag: Q) -> FindChildren<'a> {
         FindChildren {
             tag: tag.as_qname(),
             child_iter: self.children(),
@@ -1102,8 +1116,7 @@ impl Element {
     }
 
     /// Returns all children with the given name.
-    pub fn find_all_mut<'a, Q: AsQName<'a>>(&'a mut self, tag: Q) -> FindChildrenMut<'a>
-    {
+    pub fn find_all_mut<'a, Q: AsQName<'a>>(&'a mut self, tag: Q) -> FindChildrenMut<'a> {
         FindChildrenMut {
             tag: tag.as_qname(),
             child_iter: self.children_mut(),
@@ -1137,9 +1150,12 @@ impl Element {
     ///
     /// This returns a reference to the element so you can chain the calls.
     pub fn set_attr<'a, Q: AsQName<'a>, S: Into<String>>(
-        &'a mut self, name: Q, value: S) -> &'a mut Element
-    {
-        self.attributes.insert(name.as_qname().share(), value.into());
+        &'a mut self,
+        name: Q,
+        value: S,
+    ) -> &'a mut Element {
+        self.attributes
+            .insert(name.as_qname().share(), value.into());
         self
     }
 
@@ -1259,13 +1275,13 @@ pub enum XmlProlog {
 
 /// A struct that define write options.
 pub struct WriteOptions {
-    xml_prolog: Option<XmlProlog>
+    xml_prolog: Option<XmlProlog>,
 }
 
 impl Default for WriteOptions {
     fn default() -> WriteOptions {
         WriteOptions {
-            xml_prolog: Some(XmlProlog::Version10)
+            xml_prolog: Some(XmlProlog::Version10),
         }
     }
 }

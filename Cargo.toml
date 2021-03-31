@@ -8,6 +8,7 @@ repository = "https://github.com/mitsuhiko/elementtree-rust"
 keywords = ["xml", "parse", "elementtree"]
 license = "BSD-3-Clause"
 readme = "README.md"
+edition = "2018"
 
 [dependencies]
 xml-rs = "0"
