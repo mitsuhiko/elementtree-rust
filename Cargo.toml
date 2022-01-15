@@ -1,6 +1,6 @@
 [package]
 name = "elementtree"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
 description = "Parse an XML file into Python elementtree like structure"
 documentation = "http://docs.rs/elementtree"

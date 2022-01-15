@@ -2,13 +2,6 @@
 //!
 //! Not recommended for large XML files, as it will load the entire file into memory.
 //!
-//! ## Installation
-//!
-//! ```ini
-//! [dependencies]
-//! elementtree = "0"
-//! ```
-//!
 //! ## Reading
 //!
 //! For reading XML you can use the `Element::from_reader` method which will
