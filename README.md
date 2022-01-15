@@ -1,8 +1,8 @@
 # ElementTree for Rust
 
-[![Build Status](https://github.com/mitsuhiko/elementtree/workflows/Tests/badge.svg?branch=master)](https://github.com/mitsuhiko/elementtree/actions?query=workflow%3ATests)
+[![Build Status](https://github.com/mitsuhiko/elementtree-rust/workflows/Tests/badge.svg?branch=master)](https://github.com/mitsuhiko/elementtree-rust/actions?query=workflow%3ATests)
 [![Crates.io](https://img.shields.io/crates/d/elementtree.svg)](https://crates.io/crates/elementtree)
-[![License](https://img.shields.io/github/license/mitsuhiko/elementtree)](https://github.com/mitsuhiko/elementtree/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/mitsuhiko/elementtree-rust)](https://github.com/mitsuhiko/elementtree-rust/blob/master/LICENSE)
 [![rustc 1.42.0](https://img.shields.io/badge/rust-1.42%2B-orange.svg)](https://img.shields.io/badge/rust-1.42%2B-orange.svg)
 [![Documentation](https://docs.rs/elementtree/badge.svg)](https://docs.rs/elementtree)
 
