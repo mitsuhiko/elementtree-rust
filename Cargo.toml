@@ -6,7 +6,7 @@ description = "Parse an XML file into Python elementtree like structure"
 documentation = "http://docs.rs/elementtree"
 repository = "https://github.com/mitsuhiko/elementtree-rust"
 keywords = ["xml", "parse", "elementtree"]
-license = "BSD-3-Clause"
+license = "Apache-2.0"
 readme = "README.md"
 edition = "2018"
 
