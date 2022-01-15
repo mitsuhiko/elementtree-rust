@@ -478,8 +478,8 @@ pub struct Element {
     children: Vec<Element>,
     nsmap: Option<Rc<NamespaceMap>>,
     emit_nsmap: bool,
-    text: Option<String>,
-    tail: Option<String>,
+    text: String,
+    tail: String,
 }
 
 /// An iterator over children of an element.
@@ -728,8 +728,8 @@ impl Element {
             nsmap,
             emit_nsmap: false,
             children: vec![],
-            text: None,
-            tail: None,
+            text: String::new(),
+            tail: String::new(),
         };
         if let Some(url) = tag.ns() {
             let prefix = rv.get_namespace_prefix(url).unwrap_or("").to_string();
@@ -900,8 +900,8 @@ impl Element {
             nsmap: parent_nsmap,
             emit_nsmap: false,
             children: vec![],
-            text: None,
-            tail: None,
+            text: String::new(),
+            tail: String::new(),
         };
         for attr in attributes {
             root.attributes
@@ -949,13 +949,13 @@ impl Element {
                 Ok(XmlEvent::Characters(s)) => {
                     let child_count = self.children.len();
                     if child_count > 0 {
-                        self.children[child_count - 1].tail = Some(s);
+                        self.children[child_count - 1].tail = s;
                     } else {
-                        self.text = Some(s);
+                        self.text = s;
                     }
                 }
                 Ok(XmlEvent::CData(s)) => {
-                    self.text = Some(s);
+                    self.text = s;
                 }
                 Ok(XmlEvent::Comment(..))
                 | Ok(XmlEvent::Whitespace(..))
@@ -981,17 +981,12 @@ impl Element {
     /// Note that this does not trim or modify whitespace so the return
     /// value might contain structural information from the XML file.
     pub fn text(&self) -> &str {
-        self.text.as_deref().unwrap_or("")
+        &self.text
     }
 
     /// Sets a new text value for the tag.
     pub fn set_text<S: Into<String>>(&mut self, value: S) -> &mut Element {
-        let value = value.into();
-        if value.is_empty() {
-            self.text = None;
-        } else {
-            self.text = Some(value);
-        }
+        self.text = value.into();
         self
     }
 
@@ -999,17 +994,12 @@ impl Element {
     ///
     /// The tail is the text following an element.
     pub fn tail(&self) -> &str {
-        self.tail.as_deref().unwrap_or("")
+        &self.tail
     }
 
     /// Sets a new tail text value for the tag.
     pub fn set_tail<S: Into<String>>(&mut self, value: S) -> &mut Element {
-        let value = value.into();
-        if value.is_empty() {
-            self.tail = None;
-        } else {
-            self.tail = Some(value);
-        }
+        self.tail = value.into();
         self
     }
 
