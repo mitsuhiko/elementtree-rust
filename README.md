@@ -3,7 +3,7 @@
 [![Build Status](https://github.com/mitsuhiko/elementtree-rust/workflows/Tests/badge.svg?branch=master)](https://github.com/mitsuhiko/elementtree-rust/actions?query=workflow%3ATests)
 [![Crates.io](https://img.shields.io/crates/d/elementtree.svg)](https://crates.io/crates/elementtree)
 [![License](https://img.shields.io/github/license/mitsuhiko/elementtree-rust)](https://github.com/mitsuhiko/elementtree-rust/blob/master/LICENSE)
-[![rustc 1.42.0](https://img.shields.io/badge/rust-1.42%2B-orange.svg)](https://img.shields.io/badge/rust-1.42%2B-orange.svg)
+[![rustc 1.49.0](https://img.shields.io/badge/rust-1.49%2B-orange.svg)](https://img.shields.io/badge/rust-1.49%2B-orange.svg)
 [![Documentation](https://docs.rs/elementtree/badge.svg)](https://docs.rs/elementtree)
 
 This library parses XML into a Python ElementTree like structure.  It currently

@@ -1,6 +1,6 @@
 [package]
 name = "elementtree"
-version = "0.7.0"
+version = "1.0.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
 description = "Parse an XML file into Python elementtree like structure"
 documentation = "http://docs.rs/elementtree"
@@ -9,6 +9,7 @@ keywords = ["xml", "parse", "elementtree"]
 license = "Apache-2.0"
 readme = "README.md"
 edition = "2018"
+rust-version = "1.49.0"
 
 [dependencies]
 xml-rs = "0.8"
