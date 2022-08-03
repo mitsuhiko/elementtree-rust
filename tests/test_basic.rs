@@ -397,3 +397,30 @@ fn test_mut_finding() {
         .collect();
     assert_eq!(&v, &["wat", "wat", "wat"]);
 }
+
+#[test]
+fn test_attr() {
+    let root = Element::from_reader(
+        r#"<?xml version="1.0"?>
+    <root xmlns="tag:myns" xmlns:foo="tag:otherns">
+        <list a="1" b="2" c="3">
+            <item foo:attr="foo1"/>
+            <item foo:attr="foo2"/>
+            <item foo:attr="foo3"/>
+            <foo:item foo:attr="fooitem"/>
+        </list>
+    </root>
+    "#
+        .as_bytes(),
+    )
+    .unwrap();
+
+    let list = root.find("{tag:myns}list").unwrap();
+    for (idx, child) in list.find_all("{tag:myns}item").enumerate() {
+        assert_eq!(
+            child.get_attr("{tag:otherns}attr"),
+            Some(format!("foo{}", idx + 1)).as_deref()
+        );
+        assert_eq!(child.get_attr("{tag:myns}attr"), None);
+    }
+}

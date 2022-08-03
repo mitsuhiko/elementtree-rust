@@ -348,13 +348,13 @@ impl<'a> Hash for QName<'a> {
 
 impl<'a> PartialOrd for QName<'a> {
     fn partial_cmp(&self, other: &QName<'a>) -> Option<Ordering> {
-        self.name().partial_cmp(other.name())
+        (self.name(), self.ns()).partial_cmp(&(other.name(), other.ns()))
     }
 }
 
 impl<'a> Ord for QName<'a> {
     fn cmp(&self, other: &QName<'a>) -> Ordering {
-        self.name().cmp(other.name())
+        (self.name(), self.ns()).cmp(&(other.name(), other.ns()))
     }
 }
 
@@ -1119,6 +1119,8 @@ impl Element {
 
     /// Look up an attribute by qualified name.
     pub fn get_attr<'a, Q: AsQName<'a>>(&'a self, name: Q) -> Option<&'a str> {
+        dbg!(&self.attributes);
+        dbg!(&name.as_qname());
         self.attributes.get(&name.as_qname()).map(|x| x.as_str())
     }
 
