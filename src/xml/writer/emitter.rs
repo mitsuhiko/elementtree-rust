@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::fmt;
 use std::io;
 use std::io::prelude::*;
@@ -413,23 +412,6 @@ impl Emitter {
             }
         } else {
             Err(EmitterError::EndElementNameIsNotSpecified)
-        }
-    }
-
-    #[cfg(test)]
-    pub fn emit_cdata<W: Write>(&mut self, target: &mut W, content: &str) -> Result<()> {
-        self.fix_non_empty_element(target)?;
-        if self.config.cdata_to_characters {
-            self.emit_characters(target, content)
-        } else {
-            // TODO: escape ']]>' characters in CDATA as two adjacent CDATA blocks
-            target.write_all(b"<![CDATA[")?;
-            target.write_all(content.as_bytes())?;
-            target.write_all(b"]]>")?;
-
-            self.after_text();
-
-            Ok(())
         }
     }
 

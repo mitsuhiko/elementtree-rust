@@ -738,7 +738,7 @@ impl Element {
 
     /// Parses some XML data into an `Element` from a reader.
     pub fn from_reader<R: Read>(r: R) -> Result<Element, Error> {
-        let cfg = ParserConfig::new().whitespace_to_characters(true);
+        let cfg = ParserConfig::new();
         let mut reader = cfg.create_reader(r);
         loop {
             match reader.next_event() {
@@ -755,10 +755,7 @@ impl Element {
                         &mut reader,
                     );
                 }
-                Ok(XmlEvent::Comment(..))
-                | Ok(XmlEvent::Whitespace(..))
-                | Ok(XmlEvent::StartDocument { .. })
-                | Ok(XmlEvent::ProcessingInstruction { .. }) => {
+                Ok(XmlEvent::StartDocument { .. }) | Ok(XmlEvent::ProcessingInstruction { .. }) => {
                     continue;
                 }
                 Ok(_) => {
@@ -950,13 +947,7 @@ impl Element {
                         self.text = s;
                     }
                 }
-                Ok(XmlEvent::CData(s)) => {
-                    self.text = s;
-                }
-                Ok(XmlEvent::Comment(..))
-                | Ok(XmlEvent::Whitespace(..))
-                | Ok(XmlEvent::StartDocument { .. })
-                | Ok(XmlEvent::ProcessingInstruction { .. }) => {
+                Ok(XmlEvent::StartDocument { .. }) | Ok(XmlEvent::ProcessingInstruction { .. }) => {
                     continue;
                 }
                 Ok(_) => {

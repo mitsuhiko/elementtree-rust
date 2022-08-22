@@ -117,11 +117,6 @@ impl PullParser {
             pop_namespace: false,
         }
     }
-
-    /// Checks if this parser ignores the end of stream errors.
-    pub fn is_ignoring_end_of_stream(&self) -> bool {
-        self.config.ignore_end_of_stream
-    }
 }
 
 impl Position for PullParser {
@@ -300,10 +295,6 @@ impl PullParser {
                 // self.st != State::OutsideTag
                 self_error!(self; "Unexpected end of stream") // TODO: add expected hint?
             }
-        } else if self.config.ignore_end_of_stream {
-            self.final_result = None;
-            self.lexer.reset_eof_handled();
-            return self_error!(self; "Unexpected end of stream: still inside the root element");
         } else {
             self_error!(self; "Unexpected end of stream: still inside the root element")
         };

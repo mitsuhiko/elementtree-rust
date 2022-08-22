@@ -82,20 +82,6 @@ pub enum XmlEvent {
         name: OwnedName,
     },
 
-    /// Denotes CDATA content.
-    ///
-    /// This event contains unparsed data. No unescaping will be performed.
-    ///
-    /// It is possible to configure a parser to emit `Characters` event instead of `CData`. See
-    /// `pull::ParserConfiguration` structure for more information.
-    CData(String),
-
-    /// Denotes a comment.
-    ///
-    /// It is possible to configure a parser to ignore comments, so this event will never be emitted.
-    /// See `pull::ParserConfiguration` structure for more information.
-    Comment(String),
-
     /// Denotes character data outside of tags.
     ///
     /// Contents of this event will always be unescaped, so no entities like `&lt;` or `&amp;` or `&#123;`
@@ -104,13 +90,6 @@ pub enum XmlEvent {
     /// It is possible to configure a parser to trim leading and trailing whitespace for this event.
     /// See `pull::ParserConfiguration` structure for more information.
     Characters(String),
-
-    /// Denotes a chunk of whitespace outside of tags.
-    ///
-    /// It is possible to configure a parser to emit `Characters` event instead of `Whitespace`.
-    /// See `pull::ParserConfiguration` structure for more information. When combined with whitespace
-    /// trimming, it will eliminate standalone whitespace from the event stream completely.
-    Whitespace(String),
 }
 
 impl fmt::Debug for XmlEvent {
@@ -155,10 +134,7 @@ impl fmt::Debug for XmlEvent {
                 }
             ),
             XmlEvent::EndElement { ref name } => write!(f, "EndElement({})", name),
-            XmlEvent::Comment(ref data) => write!(f, "Comment({})", data),
-            XmlEvent::CData(ref data) => write!(f, "CData({})", data),
             XmlEvent::Characters(ref data) => write!(f, "Characters({})", data),
-            XmlEvent::Whitespace(ref data) => write!(f, "Whitespace({})", data),
         }
     }
 }
@@ -201,14 +177,7 @@ impl XmlEvent {
                     name: Some(name.borrow()),
                 })
             }
-            XmlEvent::Comment(ref data) => {
-                Some(crate::xml::writer::events::XmlEvent::Comment(data))
-            }
-            XmlEvent::CData(ref data) => Some(crate::xml::writer::events::XmlEvent::CData(data)),
             XmlEvent::Characters(ref data) => {
-                Some(crate::xml::writer::events::XmlEvent::Characters(data))
-            }
-            XmlEvent::Whitespace(ref data) => {
                 Some(crate::xml::writer::events::XmlEvent::Characters(data))
             }
             _ => None,

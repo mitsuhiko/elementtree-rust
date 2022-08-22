@@ -1,7 +1,9 @@
 StartDocument(1.0, utf-8)
 StartElement(p)
+Characters("\n    ")
 StartElement(a)
 Characters("test ©≂̸")
 EndElement(a)
+Characters("\n")
 EndElement(p)
 EndDocument

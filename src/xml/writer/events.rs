@@ -75,13 +75,6 @@ pub enum XmlEvent<'a> {
         name: Option<Name<'a>>,
     },
 
-    /// Denotes CDATA content.
-    ///
-    /// This event contains unparsed data, and no escaping will be performed when writing it
-    /// to the output stream.
-    #[cfg(test)]
-    CData(&'a str),
-
     /// Denotes a comment.
     ///
     /// The string will be checked for invalid sequences and error will be returned by the

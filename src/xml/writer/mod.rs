@@ -47,8 +47,6 @@ impl<W: Write> EventWriter<W> {
     /// Note that output data may not exactly correspond to the written event because
     /// of various configuration options. For example, `XmlEvent::EndElement` may
     /// correspond to a separate closing element or it may cause writing an empty element.
-    /// Another example is that `XmlEvent::CData` may be represented as characters in
-    /// the output stream.
     pub fn write<'a, E>(&mut self, event: E) -> Result<()>
     where
         E: Into<XmlEvent<'a>>,
@@ -88,8 +86,6 @@ impl<W: Write> EventWriter<W> {
             }
             #[cfg(test)]
             XmlEvent::Comment(content) => self.emitter.emit_comment(&mut self.sink, content),
-            #[cfg(test)]
-            XmlEvent::CData(content) => self.emitter.emit_cdata(&mut self.sink, content),
             XmlEvent::Characters(content) => self.emitter.emit_characters(&mut self.sink, content),
         }
     }

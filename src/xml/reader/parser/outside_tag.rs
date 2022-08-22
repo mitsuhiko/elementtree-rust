@@ -1,4 +1,3 @@
-use crate::xml::common::is_whitespace_char;
 use crate::xml::reader::events::XmlEvent;
 use crate::xml::reader::lexer::Token;
 
@@ -14,13 +13,7 @@ impl PullParser {
                 self.as_state_continue(State::InsideReference(Box::new(State::OutsideTag)))
             }
 
-            Token::Whitespace(_)
-                if self.depth() == 0 && self.config.ignore_root_level_whitespace =>
-            {
-                None
-            } // skip whitespace outside of the root element
-
-            Token::Whitespace(_) if self.config.trim_whitespace && !self.buf_has_data() => None,
+            Token::Whitespace(_) if self.depth() == 0 => None, // skip whitespace outside of the root element
 
             Token::Whitespace(c) => {
                 if !self.buf_has_data() {
@@ -50,17 +43,13 @@ impl PullParser {
                 None
             }
 
-            Token::CommentStart
-                if self.config.coalesce_characters && self.config.ignore_comments =>
-            {
+            Token::CommentStart => {
                 // We need to switch the lexer into a comment mode inside comments
                 self.lexer.inside_comment();
                 self.as_state_continue(State::InsideComment)
             }
 
-            Token::CDataStart
-                if self.config.coalesce_characters && self.config.cdata_to_characters =>
-            {
+            Token::CDataStart => {
                 if !self.buf_has_data() {
                     self.push_pos();
                 }
@@ -74,17 +63,7 @@ impl PullParser {
                 // or a whitespace
                 let mut next_event = if self.buf_has_data() {
                     let buf = self.take_buf();
-                    if self.inside_whitespace && self.config.trim_whitespace {
-                        None
-                    } else if self.inside_whitespace && !self.config.whitespace_to_characters {
-                        Some(Ok(XmlEvent::Whitespace(buf)))
-                    } else if self.config.trim_whitespace {
-                        Some(Ok(XmlEvent::Characters(
-                            buf.trim_matches(is_whitespace_char).into(),
-                        )))
-                    } else {
-                        Some(Ok(XmlEvent::Characters(buf)))
-                    }
+                    Some(Ok(XmlEvent::Characters(buf)))
                 } else {
                     None
                 };

@@ -31,12 +31,7 @@ fn sample_1_short() {
     test(
         include_bytes!("documents/sample_1.xml"),
         include_bytes!("documents/sample_1_short.txt"),
-        ParserConfig::new()
-            .ignore_comments(true)
-            .whitespace_to_characters(true)
-            .cdata_to_characters(true)
-            .trim_whitespace(true)
-            .coalesce_characters(true),
+        ParserConfig::new(),
         false,
     );
 }
@@ -46,12 +41,7 @@ fn sample_1_full() {
     test(
         include_bytes!("documents/sample_1.xml"),
         include_bytes!("documents/sample_1_full.txt"),
-        ParserConfig::new()
-            .ignore_comments(false)
-            .whitespace_to_characters(false)
-            .cdata_to_characters(false)
-            .trim_whitespace(false)
-            .coalesce_characters(false),
+        ParserConfig::new(),
         false,
     );
 }
@@ -61,12 +51,7 @@ fn sample_2_short() {
     test(
         include_bytes!("documents/sample_2.xml"),
         include_bytes!("documents/sample_2_short.txt"),
-        ParserConfig::new()
-            .ignore_comments(true)
-            .whitespace_to_characters(true)
-            .cdata_to_characters(true)
-            .trim_whitespace(true)
-            .coalesce_characters(true),
+        ParserConfig::new(),
         false,
     );
 }
@@ -76,12 +61,7 @@ fn sample_2_full() {
     test(
         include_bytes!("documents/sample_2.xml"),
         include_bytes!("documents/sample_2_full.txt"),
-        ParserConfig::new()
-            .ignore_comments(false)
-            .whitespace_to_characters(false)
-            .cdata_to_characters(false)
-            .trim_whitespace(false)
-            .coalesce_characters(false),
+        ParserConfig::new(),
         false,
     );
 }
@@ -91,12 +71,7 @@ fn sample_3_short() {
     test(
         include_bytes!("documents/sample_3.xml"),
         include_bytes!("documents/sample_3_short.txt"),
-        ParserConfig::new()
-            .ignore_comments(true)
-            .whitespace_to_characters(true)
-            .cdata_to_characters(true)
-            .trim_whitespace(true)
-            .coalesce_characters(true),
+        ParserConfig::new(),
         true,
     );
 }
@@ -106,12 +81,7 @@ fn sample_3_full() {
     test(
         include_bytes!("documents/sample_3.xml"),
         include_bytes!("documents/sample_3_full.txt"),
-        ParserConfig::new()
-            .ignore_comments(false)
-            .whitespace_to_characters(false)
-            .cdata_to_characters(false)
-            .trim_whitespace(false)
-            .coalesce_characters(false),
+        ParserConfig::new(),
         true,
     );
 }
@@ -121,12 +91,7 @@ fn sample_4_short() {
     test(
         include_bytes!("documents/sample_4.xml"),
         include_bytes!("documents/sample_4_short.txt"),
-        ParserConfig::new()
-            .ignore_comments(true)
-            .whitespace_to_characters(true)
-            .cdata_to_characters(true)
-            .trim_whitespace(true)
-            .coalesce_characters(true),
+        ParserConfig::new(),
         false,
     );
 }
@@ -136,12 +101,7 @@ fn sample_4_full() {
     test(
         include_bytes!("documents/sample_4.xml"),
         include_bytes!("documents/sample_4_full.txt"),
-        ParserConfig::new()
-            .ignore_comments(false)
-            .whitespace_to_characters(false)
-            .cdata_to_characters(false)
-            .trim_whitespace(false)
-            .coalesce_characters(false),
+        ParserConfig::new(),
         false,
     );
 }
@@ -152,11 +112,6 @@ fn sample_5_short() {
         include_bytes!("documents/sample_5.xml"),
         include_bytes!("documents/sample_5_short.txt"),
         ParserConfig::new()
-            .ignore_comments(true)
-            .whitespace_to_characters(true)
-            .cdata_to_characters(true)
-            .trim_whitespace(true)
-            .coalesce_characters(true)
             .add_entity("nbsp", " ")
             .add_entity("copy", "©")
             .add_entity("NotEqualTilde", "≂̸"),
@@ -169,13 +124,7 @@ fn sample_6_full() {
     test(
         include_bytes!("documents/sample_6.xml"),
         include_bytes!("documents/sample_6_full.txt"),
-        ParserConfig::new()
-            .ignore_root_level_whitespace(false)
-            .ignore_comments(false)
-            .whitespace_to_characters(false)
-            .cdata_to_characters(false)
-            .trim_whitespace(false)
-            .coalesce_characters(false),
+        ParserConfig::new(),
         false,
     );
 }
@@ -228,12 +177,13 @@ fn tabs_1() {
         br#"
             |1:2 StartDocument(1.0, UTF-8)
             |1:2 StartElement(a)
+            |1:5 Characters("\t")
             |1:6 StartElement(b)
             |1:6 EndElement(b)
             |1:10 EndElement(a)
             |1:14 EndDocument
         "#,
-        ParserConfig::new().trim_whitespace(true),
+        ParserConfig::new(),
         true,
     );
 }
@@ -322,7 +272,7 @@ fn issue_98_cdata_ending_with_right_bracket() {
         br#"
             |StartDocument(1.0, UTF-8)
             |StartElement(hello)
-            |CData("Foo [Bar]")
+            |Characters("Foo [Bar]")
             |EndElement(hello)
             |EndDocument
         "#,
@@ -377,7 +327,7 @@ fn issue_105_unexpected_double_dash() {
         br#"
             |StartDocument(1.0, UTF-8)
             |StartElement(hello)
-            |CData("--")
+            |Characters("--")
             |EndElement(hello)
             |EndDocument
         "#,
@@ -422,40 +372,6 @@ fn issue_replacement_character_entity_reference() {
             |1:13 Invalid hexadecimal character number in an entity: #xd83d
         "#,
         ParserConfig::new(),
-        false,
-    );
-
-    test(
-        br#"<doc>&#55357;&#56628;</doc>"#,
-        format!(
-            r#"
-                |StartDocument(1.0, UTF-8)
-                |StartElement(doc)
-                |Characters("{replacement_character}{replacement_character}")
-                |EndElement(doc)
-                |EndDocument
-            "#,
-            replacement_character = "\u{fffd}"
-        )
-        .as_bytes(),
-        ParserConfig::new().replace_unknown_entity_references(true),
-        false,
-    );
-
-    test(
-        br#"<doc>&#xd83d;&#xdd34;</doc>"#,
-        format!(
-            r#"
-                |StartDocument(1.0, UTF-8)
-                |StartElement(doc)
-                |Characters("{replacement_character}{replacement_character}")
-                |EndElement(doc)
-                |EndDocument
-            "#,
-            replacement_character = "\u{fffd}"
-        )
-        .as_bytes(),
-        ParserConfig::new().replace_unknown_entity_references(true),
         false,
     );
 }
@@ -578,13 +494,8 @@ impl<'a> fmt::Display for Event<'a> {
                     }
                 }
                 XmlEvent::EndElement { ref name } => write!(f, "EndElement({})", Name(name)),
-                XmlEvent::Comment(ref data) => write!(f, r#"Comment("{}")"#, data.escape_debug()),
-                XmlEvent::CData(ref data) => write!(f, r#"CData("{}")"#, data.escape_debug()),
                 XmlEvent::Characters(ref data) => {
                     write!(f, r#"Characters("{}")"#, data.escape_debug())
-                }
-                XmlEvent::Whitespace(ref data) => {
-                    write!(f, r#"Whitespace("{}")"#, data.escape_debug())
                 }
             },
             Err(ref e) => e.fmt(f),

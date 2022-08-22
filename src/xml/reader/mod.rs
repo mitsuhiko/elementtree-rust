@@ -98,7 +98,7 @@ impl<R: Read> Iterator for Events<R> {
 
     #[inline]
     fn next(&mut self) -> Option<Outcome<XmlEvent>> {
-        if self.finished && !self.reader.parser.is_ignoring_end_of_stream() {
+        if self.finished {
             None
         } else {
             let ev = self.reader.next_event();

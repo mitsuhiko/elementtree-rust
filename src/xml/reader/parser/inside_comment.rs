@@ -1,4 +1,3 @@
-use crate::xml::reader::events::XmlEvent;
 use crate::xml::reader::lexer::Token;
 use crate::xml::reader::parser::{ParserOutcome, PullParser, State};
 
@@ -10,23 +9,12 @@ impl PullParser {
                 Some(self_error!(self; "Unexpected token inside a comment: --"))
             }
 
-            Token::CommentEnd if self.config.ignore_comments => {
+            Token::CommentEnd => {
                 self.lexer.outside_comment();
                 self.as_state_continue(State::OutsideTag)
             }
 
-            Token::CommentEnd => {
-                self.lexer.outside_comment();
-                let data = self.take_buf();
-                self.as_state_emit(State::OutsideTag, Ok(XmlEvent::Comment(data)))
-            }
-
-            _ if self.config.ignore_comments => None, // Do not modify buffer if ignoring the comment
-
-            _ => {
-                t.push_to_string(&mut self.buf);
-                None
-            }
+            _ => None, // Do not modify buffer if ignoring the comment
         }
     }
 }

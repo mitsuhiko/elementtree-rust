@@ -1,4 +1,3 @@
-use crate::xml::reader::events::XmlEvent;
 use crate::xml::reader::lexer::Token;
 use crate::xml::reader::parser::{ParserOutcome, PullParser, State};
 
@@ -7,13 +6,7 @@ impl PullParser {
         match t {
             Token::CDataEnd => {
                 self.lexer.enable_errors();
-                let event = if self.config.cdata_to_characters {
-                    None
-                } else {
-                    let data = self.take_buf();
-                    Some(Ok(XmlEvent::CData(data)))
-                };
-                self.as_state(State::OutsideTag, event)
+                self.as_state(State::OutsideTag, None)
             }
 
             Token::Whitespace(_) => {
