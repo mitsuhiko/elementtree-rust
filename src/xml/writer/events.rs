@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use crate::xml::attribute::Attribute;
 use crate::xml::common::XmlVersion;
 use crate::xml::name::Name;
-use crate::xml::namespace::{Namespace, NS_NO_PREFIX};
+use crate::xml::namespace::Namespace;
 
 /// A part of an XML output stream.
 ///
@@ -36,6 +36,7 @@ pub enum XmlEvent<'a> {
     },
 
     /// Denotes an XML processing instruction.
+    #[cfg(test)]
     ProcessingInstruction {
         /// Processing instruction target.
         name: &'a str,
@@ -78,12 +79,14 @@ pub enum XmlEvent<'a> {
     ///
     /// This event contains unparsed data, and no escaping will be performed when writing it
     /// to the output stream.
+    #[cfg(test)]
     CData(&'a str),
 
     /// Denotes a comment.
     ///
     /// The string will be checked for invalid sequences and error will be returned by the
     /// write operation
+    #[cfg(test)]
     Comment(&'a str),
 
     /// Denotes character data outside of tags.
@@ -94,17 +97,12 @@ pub enum XmlEvent<'a> {
 }
 
 impl<'a> XmlEvent<'a> {
-    /// Returns an writer event for a processing instruction.
-    #[inline]
-    pub fn processing_instruction(name: &'a str, data: Option<&'a str>) -> XmlEvent<'a> {
-        XmlEvent::ProcessingInstruction { name, data }
-    }
-
     /// Returns a builder for a starting element.
     ///
     /// This builder can then be used to tweak attributes and namespace starting at
     /// this element.
     #[inline]
+    #[cfg(test)]
     pub fn start_element<S>(name: S) -> StartElementBuilder<'a>
     where
         S: Into<Name<'a>>,
@@ -122,29 +120,23 @@ impl<'a> XmlEvent<'a> {
     /// the writer is able to determine it automatically. However, when this functionality
     /// is disabled, it is possible to specify the name with `name()` method on the builder.
     #[inline]
+    #[cfg(test)]
     pub fn end_element() -> EndElementBuilder<'a> {
         EndElementBuilder { name: None }
-    }
-
-    /// Returns a CDATA event.
-    ///
-    /// Naturally, the provided string won't be escaped, except for closing CDATA token `]]>`
-    /// (depending on the configuration).
-    #[inline]
-    pub fn cdata(data: &'a str) -> XmlEvent<'a> {
-        XmlEvent::CData(data)
     }
 
     /// Returns a regular characters (PCDATA) event.
     ///
     /// All offending symbols, in particular, `&` and `<`, will be escaped by the writer.
     #[inline]
+    #[cfg(test)]
     pub fn characters(data: &'a str) -> XmlEvent<'a> {
         XmlEvent::Characters(data)
     }
 
     /// Returns a comment event.
     #[inline]
+    #[cfg(test)]
     pub fn comment(data: &'a str) -> XmlEvent<'a> {
         XmlEvent::Comment(data)
     }
@@ -159,24 +151,6 @@ impl<'a> From<&'a str> for XmlEvent<'a> {
 
 pub struct EndElementBuilder<'a> {
     name: Option<Name<'a>>,
-}
-
-/// A builder for a closing element event.
-impl<'a> EndElementBuilder<'a> {
-    /// Sets the name of this closing element.
-    ///
-    /// Usually the writer is able to determine closing element names automatically. If
-    /// this functionality is enabled (by default it is), then this name is checked for correctness.
-    /// It is possible, however, to disable such behavior; then the user must ensure that
-    /// closing element name is correct manually.
-    #[inline]
-    pub fn name<N>(mut self, name: N) -> EndElementBuilder<'a>
-    where
-        N: Into<Name<'a>>,
-    {
-        self.name = Some(name.into());
-        self
-    }
 }
 
 impl<'a> From<EndElementBuilder<'a>> for XmlEvent<'a> {
@@ -204,6 +178,7 @@ impl<'a> StartElementBuilder<'a> {
     ///
     /// The writer checks that you don't specify reserved prefix names, for example `xmlns`.
     #[inline]
+    #[cfg(test)]
     pub fn attr<N>(mut self, name: N, value: &'a str) -> StartElementBuilder<'a>
     where
         N: Into<Name<'a>>,
@@ -225,24 +200,13 @@ impl<'a> StartElementBuilder<'a> {
     /// then another binding will be added as a part of this element attribute set, shadowing
     /// the outer binding.
     #[inline]
+    #[cfg(test)]
     pub fn ns<S1, S2>(mut self, prefix: S1, uri: S2) -> StartElementBuilder<'a>
     where
         S1: Into<String>,
         S2: Into<String>,
     {
         self.namespace.put(prefix, uri);
-        self
-    }
-
-    /// Adds a default namespace mapping to the current namespace context.
-    ///
-    /// Same rules as for `ns()` are also valid for the default namespace mapping.
-    #[inline]
-    pub fn default_ns<S>(mut self, uri: S) -> StartElementBuilder<'a>
-    where
-        S: Into<String>,
-    {
-        self.namespace.put(NS_NO_PREFIX, uri);
         self
     }
 }

@@ -14,3 +14,6 @@ pub mod namespace;
 pub mod reader;
 mod util;
 pub mod writer;
+
+#[cfg(test)]
+mod tests;

@@ -33,6 +33,7 @@ pub struct EventReader<R: Read> {
 impl<R: Read> EventReader<R> {
     /// Creates a new reader, consuming the given stream.
     #[inline]
+    #[cfg(test)]
     pub fn new(source: R) -> EventReader<R> {
         EventReader::new_with_config(source, ParserConfig::new())
     }
@@ -53,22 +54,6 @@ impl<R: Read> EventReader<R> {
     #[inline]
     pub fn next_event(&mut self) -> Outcome<XmlEvent> {
         self.parser.next(&mut self.source)
-    }
-
-    pub fn source(&self) -> &R {
-        &self.source
-    }
-    pub fn source_mut(&mut self) -> &mut R {
-        &mut self.source
-    }
-
-    /// Unwraps this `EventReader`, returning the underlying reader.
-    ///
-    /// Note that this operation is destructive; unwrapping the reader and wrapping it
-    /// again with `EventReader::new()` will create a fresh reader which will attempt
-    /// to parse an XML document from the beginning.
-    pub fn into_inner(self) -> R {
-        self.source
     }
 }
 
@@ -102,15 +87,7 @@ pub struct Events<R: Read> {
 }
 
 impl<R: Read> Events<R> {
-    /// Unwraps the iterator, returning the internal `EventReader`.
-    #[inline]
-    pub fn into_inner(self) -> EventReader<R> {
-        self.reader
-    }
-
-    pub fn source(&self) -> &R {
-        &self.reader.source
-    }
+    #[cfg(test)]
     pub fn source_mut(&mut self) -> &mut R {
         &mut self.reader.source
     }
@@ -131,13 +108,5 @@ impl<R: Read> Iterator for Events<R> {
             }
             Some(ev)
         }
-    }
-}
-
-impl<'r> EventReader<&'r [u8]> {
-    /// A convenience method to create an `XmlReader` from a string slice.
-    #[inline]
-    pub fn parse_str(source: &'r str) -> EventReader<&'r [u8]> {
-        EventReader::new(source.as_bytes())
     }
 }

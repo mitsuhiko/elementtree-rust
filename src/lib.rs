@@ -86,6 +86,8 @@
 //! copied and the writer will emit them accordingly.
 //!
 //! Namespaces need to be registered or the XML generated will be malformed.
+#![allow(clippy::wrong_self_convention)]
+
 use std::borrow::Cow;
 use std::cmp::Ord;
 use std::cmp::Ordering;
@@ -103,12 +105,6 @@ use std::str::Utf8Error;
 use string_cache::DefaultAtom as Atom;
 
 mod xml;
-
-// this exists for internal doctests only
-#[doc(hidden)]
-pub mod _xml {
-    pub use super::xml::*;
-}
 
 use crate::xml::attribute::{Attribute, OwnedAttribute};
 use crate::xml::common::{Position as XmlPosition, XmlVersion};

@@ -359,19 +359,6 @@ impl NamespaceStack {
 }
 
 /// An iterator over mappings from prefixes to URIs in a namespace stack.
-///
-/// # Example
-/// ```
-/// # use elementtree::_xml::namespace::NamespaceStack;
-/// let mut nst = NamespaceStack::empty();
-/// nst.push_empty();
-/// nst.put("a", "urn:A");
-/// nst.put("b", "urn:B");
-/// nst.push_empty();
-/// nst.put("c", "urn:C");
-///
-/// assert_eq!(vec![("c", "urn:C"), ("a", "urn:A"), ("b", "urn:B")], nst.iter().collect::<Vec<_>>());
-/// ```
 pub struct NamespaceStackMappings<'a> {
     namespaces: Rev<Iter<'a, Namespace>>,
     current_namespace: Option<NamespaceMappings<'a>>,
@@ -461,43 +448,6 @@ impl<'a> Extend<UriMapping<'a>> for NamespaceStack {
 }
 
 /// A wrapper around `NamespaceStack` which implements `Extend` using `put_checked()`.
-///
-/// # Example
-///
-/// ```
-/// # use elementtree::_xml::namespace::NamespaceStack;
-///
-/// let mut nst = NamespaceStack::empty();
-/// nst.push_empty();
-/// nst.put("a", "urn:A");
-/// nst.put("b", "urn:B");
-/// nst.push_empty();
-/// nst.put("c", "urn:C");
-///
-/// nst.checked_target().extend(vec![("a", "urn:Z"), ("b", "urn:B"), ("c", "urn:Y"), ("d", "urn:D")]);
-/// assert_eq!(
-///     vec![("a", "urn:Z"), ("c", "urn:C"), ("d", "urn:D"), ("b", "urn:B")],
-///     nst.iter().collect::<Vec<_>>()
-/// );
-/// ```
-///
-/// Compare:
-///
-/// ```
-/// # use elementtree::_xml::namespace::NamespaceStack;
-/// # let mut nst = NamespaceStack::empty();
-/// # nst.push_empty();
-/// # nst.put("a", "urn:A");
-/// # nst.put("b", "urn:B");
-/// # nst.push_empty();
-/// # nst.put("c", "urn:C");
-///
-/// nst.extend(vec![("a", "urn:Z"), ("b", "urn:B"), ("c", "urn:Y"), ("d", "urn:D")]);
-/// assert_eq!(
-///     vec![("a", "urn:Z"), ("b", "urn:B"), ("c", "urn:C"), ("d", "urn:D")],
-///     nst.iter().collect::<Vec<_>>()
-/// );
-/// ```
 pub struct CheckedTarget<'a>(&'a mut NamespaceStack);
 
 impl<'a, 'b> Extend<UriMapping<'b>> for CheckedTarget<'a> {
@@ -509,4 +459,68 @@ impl<'a, 'b> Extend<UriMapping<'b>> for CheckedTarget<'a> {
             self.0.put_checked(prefix, uri);
         }
     }
+}
+
+#[test]
+fn test_namespace_iter() {
+    let mut nst = NamespaceStack::empty();
+    nst.push_empty();
+    nst.put("a", "urn:A");
+    nst.put("b", "urn:B");
+    nst.push_empty();
+    nst.put("c", "urn:C");
+
+    assert_eq!(
+        vec![("c", "urn:C"), ("a", "urn:A"), ("b", "urn:B")],
+        nst.iter().collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_checked_target() {
+    let mut nst = NamespaceStack::empty();
+    nst.push_empty();
+    nst.put("a", "urn:A");
+    nst.put("b", "urn:B");
+    nst.push_empty();
+    nst.put("c", "urn:C");
+
+    nst.checked_target().extend(vec![
+        ("a", "urn:Z"),
+        ("b", "urn:B"),
+        ("c", "urn:Y"),
+        ("d", "urn:D"),
+    ]);
+    assert_eq!(
+        vec![
+            ("a", "urn:Z"),
+            ("c", "urn:C"),
+            ("d", "urn:D"),
+            ("b", "urn:B")
+        ],
+        nst.iter().collect::<Vec<_>>()
+    );
+
+    let mut nst = NamespaceStack::empty();
+    nst.push_empty();
+    nst.put("a", "urn:A");
+    nst.put("b", "urn:B");
+    nst.push_empty();
+    nst.put("c", "urn:C");
+
+    nst.extend(vec![
+        ("a", "urn:Z"),
+        ("b", "urn:B"),
+        ("c", "urn:Y"),
+        ("d", "urn:D"),
+    ]);
+    assert_eq!(
+        vec![
+            ("a", "urn:Z"),
+            ("b", "urn:B"),
+            ("c", "urn:C"),
+            ("d", "urn:D")
+        ],
+        nst.iter().collect::<Vec<_>>()
+    );
 }

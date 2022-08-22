@@ -258,6 +258,7 @@ impl Emitter {
         }
     }
 
+    #[cfg(test)]
     pub fn emit_processing_instruction<W: Write>(
         &mut self,
         target: &mut W,
@@ -425,6 +426,7 @@ impl Emitter {
         }
     }
 
+    #[cfg(test)]
     pub fn emit_cdata<W: Write>(&mut self, target: &mut W, content: &str) -> Result<()> {
         self.fix_non_empty_element(target)?;
         if self.config.cdata_to_characters {
@@ -456,6 +458,7 @@ impl Emitter {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn emit_comment<W: Write>(&mut self, target: &mut W, content: &str) -> Result<()> {
         self.fix_non_empty_element(target)?;
 

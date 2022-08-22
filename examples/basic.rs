@@ -2,7 +2,7 @@ extern crate elementtree;
 
 use elementtree::Element;
 
-const XML: &'static str = include_str!("test.xml");
+const XML: &str = include_str!("test.xml");
 
 pub fn main() {
     let root = Element::from_reader(&mut XML.as_bytes()).unwrap();

@@ -6,9 +6,9 @@ use std::fs::File;
 use std::io::{stderr, BufRead, BufReader, Write};
 use std::path::Path;
 
-use elementtree::_xml::common::Position;
-use elementtree::_xml::name::OwnedName;
-use elementtree::_xml::reader::{EventReader, Outcome, ParserConfig, XmlEvent};
+use crate::xml::common::Position;
+use crate::xml::name::OwnedName;
+use crate::xml::reader::{EventReader, Outcome, ParserConfig, XmlEvent};
 
 use once_cell::sync::Lazy;
 

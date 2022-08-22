@@ -1,6 +1,5 @@
 //! Contains `XmlEvent` datatype, instances of which are emitted by the parser.
 
-use std::borrow::Cow;
 use std::fmt;
 
 use crate::xml::attribute::OwnedAttribute;
@@ -170,39 +169,7 @@ impl XmlEvent {
     /// This method is useful for streaming processing of XML documents where the output
     /// is also an XML document. With this method it is possible to process some events
     /// while passing other events through to the writer unchanged:
-    ///
-    /// ```rust
-    /// use std::str;
-    ///
-    /// use elementtree::_xml::{EventReader, EventWriter};
-    /// use elementtree::_xml::reader::XmlEvent as ReaderEvent;
-    /// use elementtree::_xml::writer::XmlEvent as WriterEvent;
-    ///
-    /// let mut input: &[u8] = b"<hello>world</hello>";
-    /// let mut output: Vec<u8> = Vec::new();
-    ///
-    /// {
-    ///     let mut reader = EventReader::new(&mut input);
-    ///     let mut writer = EventWriter::new(&mut output);
-    ///
-    ///     for e in reader {
-    ///         match e.unwrap() {
-    ///             ReaderEvent::Characters(s) =>
-    ///                 writer.write(WriterEvent::characters(&s.to_uppercase())).unwrap(),
-    ///             e => if let Some(e) = e.as_writer_event() {
-    ///                 writer.write(e).unwrap()
-    ///             }
-    ///         }
-    ///     }
-    /// }
-    ///
-    /// assert_eq!(
-    ///     str::from_utf8(&output).unwrap(),
-    ///     r#"<?xml version="1.0" encoding="UTF-8"?><hello>WORLD</hello>"#
-    /// );
-    /// ```
-    ///
-    /// Note that this API may change or get additions in future to improve its ergonomics.
+    #[cfg(test)]
     pub fn as_writer_event(&self) -> Option<crate::xml::writer::events::XmlEvent<'_>> {
         match *self {
             XmlEvent::StartDocument {
@@ -227,7 +194,7 @@ impl XmlEvent {
             } => Some(crate::xml::writer::events::XmlEvent::StartElement {
                 name: name.borrow(),
                 attributes: attributes.iter().map(|a| a.borrow()).collect(),
-                namespace: Cow::Borrowed(namespace),
+                namespace: std::borrow::Cow::Borrowed(namespace),
             }),
             XmlEvent::EndElement { ref name } => {
                 Some(crate::xml::writer::events::XmlEvent::EndElement {
@@ -247,4 +214,39 @@ impl XmlEvent {
             _ => None,
         }
     }
+}
+
+#[test]
+fn test_xml_event() {
+    use std::str;
+
+    use crate::xml::reader::XmlEvent as ReaderEvent;
+    use crate::xml::writer::XmlEvent as WriterEvent;
+    use crate::xml::{EventReader, EventWriter};
+
+    let mut input: &[u8] = b"<hello>world</hello>";
+    let mut output: Vec<u8> = Vec::new();
+
+    {
+        let reader = EventReader::new(&mut input);
+        let mut writer = EventWriter::new(&mut output);
+
+        for e in reader {
+            match e.unwrap() {
+                ReaderEvent::Characters(s) => writer
+                    .write(WriterEvent::characters(&s.to_uppercase()))
+                    .unwrap(),
+                e => {
+                    if let Some(e) = e.as_writer_event() {
+                        writer.write(e).unwrap()
+                    }
+                }
+            }
+        }
+    }
+
+    assert_eq!(
+        str::from_utf8(&output).unwrap(),
+        r#"<?xml version="1.0" encoding="UTF-8"?><hello>WORLD</hello>"#
+    );
 }

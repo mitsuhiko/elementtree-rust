@@ -27,6 +27,7 @@ impl<W: Write> EventWriter<W> {
     /// Creates a new `EventWriter` out of an `std::io::Write` instance using the default
     /// configuration.
     #[inline]
+    #[cfg(test)]
     pub fn new(sink: W) -> EventWriter<W> {
         EventWriter::new_with_config(sink, EmitterConfig::new())
     }
@@ -63,6 +64,7 @@ impl<W: Write> EventWriter<W> {
                 encoding.unwrap_or("UTF-8"),
                 standalone,
             ),
+            #[cfg(test)]
             XmlEvent::ProcessingInstruction { name, data } => self
                 .emitter
                 .emit_processing_instruction(&mut self.sink, name, data),
@@ -84,28 +86,11 @@ impl<W: Write> EventWriter<W> {
                 self.emitter.namespace_stack_mut().try_pop();
                 r
             }
+            #[cfg(test)]
             XmlEvent::Comment(content) => self.emitter.emit_comment(&mut self.sink, content),
+            #[cfg(test)]
             XmlEvent::CData(content) => self.emitter.emit_cdata(&mut self.sink, content),
             XmlEvent::Characters(content) => self.emitter.emit_characters(&mut self.sink, content),
         }
-    }
-
-    /// Returns a mutable reference to the underlying `Writer`.
-    ///
-    /// Note that having a reference to the underlying sink makes it very easy to emit invalid XML
-    /// documents. Use this method with care. Valid use cases for this method include accessing
-    /// methods like `Write::flush`, which do not emit new data but rather change the state
-    /// of the stream itself.
-    pub fn inner_mut(&mut self) -> &mut W {
-        &mut self.sink
-    }
-
-    /// Unwraps this `EventWriter`, returning the underlying writer.
-    ///
-    /// Note that this is a destructive operation: unwrapping a writer and then wrapping
-    /// it again with `EventWriter::new()` will create a fresh writer whose state will be
-    /// blank; for example, accumulated namespaces will be reset.
-    pub fn into_inner(self) -> W {
-        self.sink
     }
 }

@@ -27,23 +27,6 @@ use crate::xml::namespace::NS_NO_PREFIX;
 /// context is only available when parsing a document (or it can be constructed manually
 /// when writing a document). Tying a name to a context statically seems impractical. This
 /// may change in future, though.
-///
-/// # Conversions
-///
-/// `Name` implements some `From` instances for conversion from strings and tuples. For example:
-///
-/// ```rust
-/// # use elementtree::_xml::name::Name;
-/// let n1: Name = "p:some-name".into();
-/// let n2: Name = ("p", "some-name").into();
-///
-/// assert_eq!(n1, n2);
-/// assert_eq!(n1.local_name, "some-name");
-/// assert_eq!(n1.prefix, Some("p"));
-/// assert!(n1.namespace.is_none());
-/// ```
-///
-/// This is added to support easy specification of XML elements when writing XML documents.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Name<'a> {
     /// A local name, e.g. `string` in `xsi:string`.
@@ -120,20 +103,13 @@ impl<'a> Name<'a> {
     /// Returns a new `Name` instance representing a qualified name with or without a prefix and
     /// with a namespace URI.
     #[inline]
+    #[cfg(test)]
     pub fn qualified(local_name: &'a str, namespace: &'a str, prefix: Option<&'a str>) -> Name<'a> {
         Name {
             local_name,
             namespace: Some(namespace),
             prefix,
         }
-    }
-
-    /// Returns a correct XML representation of this local name and prefix.
-    ///
-    /// This method is different from the autoimplemented `to_string()` because it does not
-    /// include namespace URI in the result.
-    pub fn to_repr(&self) -> String {
-        self.repr_display().to_string()
     }
 
     /// Returns a structure which can be displayed with `std::fmt` machinery to obtain this
@@ -200,6 +176,7 @@ impl OwnedName {
 
     /// Returns a new `OwnedName` instance representing a plain local name.
     #[inline]
+    #[cfg(test)]
     pub fn local<S>(local_name: S) -> OwnedName
     where
         S: Into<String>,
@@ -211,34 +188,11 @@ impl OwnedName {
         }
     }
 
-    /// Returns a new `OwnedName` instance representing a qualified name with or without
-    /// a prefix and with a namespace URI.
-    #[inline]
-    pub fn qualified<S1, S2, S3>(local_name: S1, namespace: S2, prefix: Option<S3>) -> OwnedName
-    where
-        S1: Into<String>,
-        S2: Into<String>,
-        S3: Into<String>,
-    {
-        OwnedName {
-            local_name: local_name.into(),
-            namespace: Some(namespace.into()),
-            prefix: prefix.map(|v| v.into()),
-        }
-    }
-
     /// Returns an optional prefix by reference, equivalent to `self.borrow().prefix`
     /// but avoids extra work.
     #[inline]
     pub fn prefix_ref(&self) -> Option<&str> {
         self.prefix.as_deref()
-    }
-
-    /// Returns an optional namespace by reference, equivalen to `self.borrow().namespace`
-    /// but avoids extra work.
-    #[inline]
-    pub fn namespace_ref(&self) -> Option<&str> {
-        self.namespace.as_deref()
     }
 }
 
@@ -286,7 +240,18 @@ impl FromStr for OwnedName {
 
 #[cfg(test)]
 mod tests {
-    use super::OwnedName;
+    use super::{Name, OwnedName};
+
+    #[test]
+    fn test_name_from() {
+        let n1: Name = "p:some-name".into();
+        let n2: Name = ("p", "some-name").into();
+
+        assert_eq!(n1, n2);
+        assert_eq!(n1.local_name, "some-name");
+        assert_eq!(n1.prefix, Some("p"));
+        assert!(n1.namespace.is_none());
+    }
 
     #[test]
     fn test_owned_name_from_str() {

@@ -25,17 +25,9 @@ impl<'a> fmt::Display for Attribute<'a> {
 }
 
 impl<'a> Attribute<'a> {
-    /// Creates an owned attribute out of this borrowed one.
-    #[inline]
-    pub fn to_owned(&self) -> OwnedAttribute {
-        OwnedAttribute {
-            name: self.name.into(),
-            value: self.value.into(),
-        }
-    }
-
     /// Creates a borrowed attribute using the provided borrowed name and a borrowed string value.
     #[inline]
+    #[cfg(test)]
     pub fn new(name: Name<'a>, value: &'a str) -> Attribute<'a> {
         Attribute { name, value }
     }
@@ -55,6 +47,7 @@ pub struct OwnedAttribute {
 
 impl OwnedAttribute {
     /// Returns a borrowed `Attribute` out of this owned one.
+    #[cfg(test)]
     pub fn borrow(&self) -> Attribute<'_> {
         Attribute {
             name: self.name.borrow(),
@@ -64,6 +57,7 @@ impl OwnedAttribute {
 
     /// Creates a new owned attribute using the provided owned name and an owned string value.
     #[inline]
+    #[cfg(test)]
     pub fn new<S: Into<String>>(name: OwnedName, value: S) -> OwnedAttribute {
         OwnedAttribute {
             name,

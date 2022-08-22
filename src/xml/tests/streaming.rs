@@ -2,9 +2,9 @@
 
 use std::io::{Cursor, Write};
 
-use elementtree::_xml::reader::ParserConfig;
-use elementtree::_xml::reader::XmlEvent;
-use elementtree::_xml::EventReader;
+use crate::xml::reader::ParserConfig;
+use crate::xml::reader::XmlEvent;
+use crate::xml::EventReader;
 
 macro_rules! assert_match {
     ($actual:expr, $expected:pat) => {

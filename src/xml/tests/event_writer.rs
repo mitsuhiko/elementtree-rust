@@ -5,8 +5,8 @@ use std::io::prelude::*;
 use std::io::{BufReader, SeekFrom};
 use std::str;
 
-use elementtree::_xml::reader::EventReader;
-use elementtree::_xml::writer::EmitterConfig;
+use crate::xml::reader::EventReader;
+use crate::xml::writer::EmitterConfig;
 
 macro_rules! unwrap_all {
     ($($e:expr);+) => {{
@@ -16,7 +16,7 @@ macro_rules! unwrap_all {
 
 #[test]
 fn reading_writing_equal_with_namespaces() {
-    let mut f = File::open("tests/documents/sample_2.xml").unwrap();
+    let mut f = File::open("src/xml/tests/documents/sample_2.xml").unwrap();
     let mut b = Vec::new();
 
     {
@@ -51,7 +51,7 @@ fn reading_writing_equal_with_namespaces() {
 
 #[test]
 fn writing_simple() {
-    use xml::writer::XmlEvent;
+    use crate::xml::writer::XmlEvent;
 
     let mut b = Vec::new();
 
@@ -74,7 +74,7 @@ fn writing_simple() {
 
 #[test]
 fn writing_empty_elements_with_normalizing() {
-    use xml::writer::XmlEvent;
+    use crate::xml::writer::XmlEvent;
 
     let mut b = Vec::new();
 
@@ -96,7 +96,7 @@ fn writing_empty_elements_with_normalizing() {
 
 #[test]
 fn writing_empty_elements_without_normalizing() {
-    use xml::writer::XmlEvent;
+    use crate::xml::writer::XmlEvent;
 
     let mut b = Vec::new();
 
@@ -122,7 +122,7 @@ fn writing_empty_elements_without_normalizing() {
 
 #[test]
 fn writing_empty_elements_without_pad_self_closing() {
-    use xml::writer::XmlEvent;
+    use crate::xml::writer::XmlEvent;
 
     let mut b = Vec::new();
 
@@ -144,7 +144,7 @@ fn writing_empty_elements_without_pad_self_closing() {
 }
 #[test]
 fn writing_empty_elements_pad_self_closing_explicit() {
-    use xml::writer::XmlEvent;
+    use crate::xml::writer::XmlEvent;
 
     let mut b = Vec::new();
 
@@ -167,7 +167,7 @@ fn writing_empty_elements_pad_self_closing_explicit() {
 
 #[test]
 fn writing_comments_with_indentation() {
-    use xml::writer::XmlEvent;
+    use crate::xml::writer::XmlEvent;
 
     let mut b = Vec::new();
 
@@ -200,7 +200,7 @@ fn writing_comments_with_indentation() {
 
 #[test]
 fn issue_112_overriding_namepace_prefix() {
-    use xml::writer::XmlEvent;
+    use crate::xml::writer::XmlEvent;
 
     let mut b = Vec::new();
 
@@ -227,7 +227,7 @@ fn issue_112_overriding_namepace_prefix() {
 
 #[test]
 fn attribute_escaping() {
-    use xml::writer::XmlEvent;
+    use crate::xml::writer::XmlEvent;
 
     let mut b = Vec::new();
 

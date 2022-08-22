@@ -92,17 +92,6 @@ pub struct ParserConfig {
 
 impl ParserConfig {
     /// Returns a new config with default values.
-    ///
-    /// You can tweak default values using builder-like pattern:
-    ///
-    /// ```rust
-    /// use elementtree::_xml::reader::ParserConfig;
-    ///
-    /// let config = ParserConfig::new()
-    ///     .trim_whitespace(true)
-    ///     .ignore_comments(true)
-    ///     .coalesce_characters(false);
-    /// ```
     pub fn new() -> ParserConfig {
         ParserConfig {
             trim_whitespace: false,
@@ -119,20 +108,6 @@ impl ParserConfig {
 
     /// Creates an XML reader with this configuration.
     ///
-    /// This is a convenience method for configuring and creating a reader at the same time:
-    ///
-    /// ```rust
-    /// use elementtree::_xml::reader::ParserConfig;
-    ///
-    /// let mut source: &[u8] = b"...";
-    ///
-    /// let reader = ParserConfig::new()
-    ///     .trim_whitespace(true)
-    ///     .ignore_comments(true)
-    ///     .coalesce_characters(false)
-    ///     .create_reader(&mut source);
-    /// ```
-    ///
     /// This method is exactly equivalent to calling `EventReader::new_with_config()` with
     /// this configuration object.
     #[inline]
@@ -141,21 +116,7 @@ impl ParserConfig {
     }
 
     /// Adds a new entity mapping and returns an updated config object.
-    ///
-    /// This is a convenience method for adding external entities mappings to the XML parser.
-    /// An example:
-    ///
-    /// ```rust
-    /// use elementtree::_xml::reader::ParserConfig;
-    ///
-    /// let mut source: &[u8] = b"...";
-    ///
-    /// let reader = ParserConfig::new()
-    ///     .add_entity("nbsp", " ")
-    ///     .add_entity("copy", "©")
-    ///     .add_entity("reg", "®")
-    ///     .create_reader(&mut source);
-    /// ```
+    #[cfg(test)]
     pub fn add_entity<S: Into<String>, T: Into<String>>(
         mut self,
         entity: S,
