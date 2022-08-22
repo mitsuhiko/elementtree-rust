@@ -102,15 +102,23 @@ use std::str::Utf8Error;
 
 use string_cache::DefaultAtom as Atom;
 
-use xml::attribute::{Attribute, OwnedAttribute};
-use xml::common::{Position as XmlPosition, XmlVersion};
-use xml::name::{Name, OwnedName};
-use xml::namespace::{Namespace as XmlNamespaceMap, NS_EMPTY_URI, NS_XMLNS_URI, NS_XML_URI};
-use xml::reader::{
+mod xml;
+
+// this exists for internal doctests only
+#[doc(hidden)]
+pub mod _xml {
+    pub use super::xml::*;
+}
+
+use crate::xml::attribute::{Attribute, OwnedAttribute};
+use crate::xml::common::{Position as XmlPosition, XmlVersion};
+use crate::xml::name::{Name, OwnedName};
+use crate::xml::namespace::{Namespace as XmlNamespaceMap, NS_EMPTY_URI, NS_XMLNS_URI, NS_XML_URI};
+use crate::xml::reader::{
     Error as XmlReadError, ErrorKind as XmlReadErrorKind, EventReader, ParserConfig, XmlEvent,
 };
-use xml::writer::{Error as XmlWriteError, EventWriter, XmlEvent as XmlWriteEvent};
-use xml::EmitterConfig;
+use crate::xml::writer::{Error as XmlWriteError, EventWriter, XmlEvent as XmlWriteEvent};
+use crate::xml::EmitterConfig;
 
 enum XmlAtom<'a> {
     Shared(Atom),
@@ -736,7 +744,7 @@ impl Element {
         let cfg = ParserConfig::new().whitespace_to_characters(true);
         let mut reader = cfg.create_reader(r);
         loop {
-            match reader.next() {
+            match reader.next_event() {
                 Ok(XmlEvent::StartElement {
                     name,
                     attributes,
@@ -913,7 +921,7 @@ impl Element {
 
     fn parse_children<R: Read>(&mut self, reader: &mut EventReader<R>) -> Result<(), Error> {
         loop {
-            match reader.next() {
+            match reader.next_event() {
                 Ok(XmlEvent::EndElement { ref name }) => {
                     if name.local_name == self.tag.name()
                         && name.namespace.as_deref() == self.tag.ns()

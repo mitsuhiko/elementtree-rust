@@ -12,5 +12,7 @@ edition = "2018"
 rust-version = "1.49.0"
 
 [dependencies]
-xml-rs = "0.8"
 string_cache = "0.8"
+
+[dev-dependencies]
+once_cell = "1.13.1"
