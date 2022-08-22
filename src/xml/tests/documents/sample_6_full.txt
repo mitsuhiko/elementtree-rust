@@ -1,0 +1,6 @@
+StartDocument(1.0, UTF-8)
+ProcessingInstruction(xml-stylesheet="href=\"doc.xsl\"")
+StartElement(doc)
+Characters("Hello")
+EndElement(doc)
+EndDocument

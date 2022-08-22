@@ -86,6 +86,8 @@
 //! copied and the writer will emit them accordingly.
 //!
 //! Namespaces need to be registered or the XML generated will be malformed.
+#![allow(clippy::wrong_self_convention)]
+
 use std::borrow::Cow;
 use std::cmp::Ord;
 use std::cmp::Ordering;
@@ -102,15 +104,18 @@ use std::str::Utf8Error;
 
 use string_cache::DefaultAtom as Atom;
 
-use xml::attribute::{Attribute, OwnedAttribute};
-use xml::common::{Position as XmlPosition, XmlVersion};
-use xml::name::{Name, OwnedName};
-use xml::namespace::{Namespace as XmlNamespaceMap, NS_EMPTY_URI, NS_XMLNS_URI, NS_XML_URI};
-use xml::reader::{
+mod xml;
+
+use crate::xml::attribute::{Attribute, OwnedAttribute};
+use crate::xml::common::Position as XmlPosition;
+use crate::xml::common::XmlVersion;
+use crate::xml::name::{Name, OwnedName};
+use crate::xml::namespace::{Namespace as XmlNamespaceMap, NS_EMPTY_URI, NS_XMLNS_URI, NS_XML_URI};
+use crate::xml::reader::{
     Error as XmlReadError, ErrorKind as XmlReadErrorKind, EventReader, ParserConfig, XmlEvent,
 };
-use xml::writer::{Error as XmlWriteError, EventWriter, XmlEvent as XmlWriteEvent};
-use xml::EmitterConfig;
+use crate::xml::writer::{Error as XmlWriteError, EventWriter, XmlEvent as XmlWriteEvent};
+use crate::xml::EmitterConfig;
 
 enum XmlAtom<'a> {
     Shared(Atom),
@@ -733,10 +738,10 @@ impl Element {
 
     /// Parses some XML data into an `Element` from a reader.
     pub fn from_reader<R: Read>(r: R) -> Result<Element, Error> {
-        let cfg = ParserConfig::new().whitespace_to_characters(true);
+        let cfg = ParserConfig::new();
         let mut reader = cfg.create_reader(r);
         loop {
-            match reader.next() {
+            match reader.next_event() {
                 Ok(XmlEvent::StartElement {
                     name,
                     attributes,
@@ -750,10 +755,7 @@ impl Element {
                         &mut reader,
                     );
                 }
-                Ok(XmlEvent::Comment(..))
-                | Ok(XmlEvent::Whitespace(..))
-                | Ok(XmlEvent::StartDocument { .. })
-                | Ok(XmlEvent::ProcessingInstruction { .. }) => {
+                Ok(XmlEvent::StartDocument { .. }) | Ok(XmlEvent::ProcessingInstruction { .. }) => {
                     continue;
                 }
                 Ok(_) => {
@@ -798,9 +800,7 @@ impl Element {
         w: W,
         options: WriteOptions,
     ) -> Result<(), Error> {
-        let mut writer = EmitterConfig::new()
-            .write_document_declaration(options.xml_prolog.is_some())
-            .create_writer(w);
+        let mut writer = options.emitter_config.clone().create_writer(w);
 
         if options.xml_prolog.is_some() {
             writer.write(XmlWriteEvent::StartDocument {
@@ -913,7 +913,7 @@ impl Element {
 
     fn parse_children<R: Read>(&mut self, reader: &mut EventReader<R>) -> Result<(), Error> {
         loop {
-            match reader.next() {
+            match reader.next_event() {
                 Ok(XmlEvent::EndElement { ref name }) => {
                     if name.local_name == self.tag.name()
                         && name.namespace.as_deref() == self.tag.ns()
@@ -947,13 +947,7 @@ impl Element {
                         self.text = s;
                     }
                 }
-                Ok(XmlEvent::CData(s)) => {
-                    self.text = s;
-                }
-                Ok(XmlEvent::Comment(..))
-                | Ok(XmlEvent::Whitespace(..))
-                | Ok(XmlEvent::StartDocument { .. })
-                | Ok(XmlEvent::ProcessingInstruction { .. }) => {
+                Ok(XmlEvent::StartDocument { .. }) | Ok(XmlEvent::ProcessingInstruction { .. }) => {
                     continue;
                 }
                 Ok(_) => {
@@ -1253,12 +1247,14 @@ pub enum XmlProlog {
 
 /// A struct that define write options.
 pub struct WriteOptions {
+    emitter_config: EmitterConfig,
     xml_prolog: Option<XmlProlog>,
 }
 
 impl Default for WriteOptions {
     fn default() -> WriteOptions {
         WriteOptions {
+            emitter_config: EmitterConfig::new(),
             xml_prolog: Some(XmlProlog::Version10),
         }
     }
@@ -1277,8 +1273,80 @@ impl WriteOptions {
     ///
     /// See RFC: [W3C XML 26 November 2008](https://www.w3.org/TR/xml/#sec-prolog-dtd)
     pub fn set_xml_prolog(mut self, prolog: Option<XmlProlog>) -> Self {
+        self.emitter_config = self
+            .emitter_config
+            .write_document_declaration(prolog.is_some());
         self.xml_prolog = prolog;
 
+        self
+    }
+
+    /// Line separator used to separate lines in formatted output. Default is `"\n"`.
+    pub fn set_line_separator<I: Into<Cow<'static, str>>>(mut self, sep: I) -> Self {
+        self.emitter_config = self.emitter_config.line_separator(sep.into());
+        self
+    }
+
+    /// A string which will be used for a single level of indentation. Default is `"  "`
+    /// (two spaces).
+    pub fn set_indent_string<I: Into<Cow<'static, str>>>(mut self, indent: I) -> Self {
+        self.emitter_config = self.emitter_config.indent_string(indent.into());
+        self
+    }
+
+    /// Whether or not the emitted document should be indented. Default is false.
+    ///
+    /// The emitter is capable to perform automatic indentation of the emitted XML document.
+    /// It is done in stream-like fashion and does not require the knowledge of the whole
+    /// document in advance.
+    ///
+    /// Sometimes, however, automatic indentation is undesirable, e.g. when you want to keep
+    /// existing layout when processing an existing XML document. Also the indentiation algorithm
+    /// is not thoroughly tested. Hence by default it is disabled.
+    pub fn set_perform_indent(mut self, yes: bool) -> Self {
+        self.emitter_config = self.emitter_config.perform_indent(yes);
+        self
+    }
+
+    /// Whether or not to convert elements with empty content to empty elements. Default is true.
+    ///
+    /// This option allows turning elements like `<a></a>` (an element with empty content)
+    /// into `<a />` (an empty element).
+    pub fn set_normalize_empty_elements(mut self, yes: bool) -> Self {
+        self.emitter_config = self.emitter_config.normalize_empty_elements(yes);
+        self
+    }
+
+    /// Whether or not to emit CDATA events as plain characters. Default is false.
+    ///
+    /// This option forces the emitter to convert CDATA events into regular character events,
+    /// performing all the necessary escaping beforehand. This may be occasionally useful
+    /// for feeding the document into incorrect parsers which do not support CDATA.
+    pub fn set_cdata_to_characters(mut self, yes: bool) -> Self {
+        self.emitter_config = self.emitter_config.cdata_to_characters(yes);
+        self
+    }
+
+    /// Whether or not to automatically insert spaces before the trailing `/>` in self-closing
+    /// elements. Default is true.
+    ///
+    /// This option is only meaningful if `normalize_empty_elements` is true. For example, the
+    /// element `<a></a>` would be unaffected. When `normalize_empty_elements` is true, then when
+    /// this option is also true, the same element would appear `<a />`. If this option is false,
+    /// then the same element would appear `<a/>`.
+    pub fn set_pad_self_closing(mut self, yes: bool) -> Self {
+        self.emitter_config = self.emitter_config.pad_self_closing(yes);
+        self
+    }
+
+    /// Whether or not to automatically insert leading and trailing spaces in emitted comments,
+    /// if necessary. Default is true.
+    ///
+    /// This is a convenience option in order for the user not to append spaces before and after
+    /// comments text in order to get more pretty comments: `<!-- something -->` instead of
+    /// `<!--something-->`.
+    pub fn set_autopad_comments(mut self, yes: bool) -> Self {
+        self.emitter_config = self.emitter_config.autopad_comments(yes);
         self
     }
 }
