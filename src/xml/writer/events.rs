@@ -91,8 +91,7 @@ pub enum XmlEvent<'a> {
 
     /// Denotes character data outside of tags.
     ///
-    /// Contents of this event will be escaped if `perform_escaping` option is enabled,
-    /// that is, every character invalid for PCDATA will appear as a character entity.
+    /// Contents of this event will be escaped.
     Characters(&'a str),
 }
 

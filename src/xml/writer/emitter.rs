@@ -318,9 +318,7 @@ impl Emitter {
     where
         W: Write,
     {
-        if self.config.keep_element_names_stack {
-            self.element_names.push(name.to_owned());
-        }
+        self.element_names.push(name.to_owned());
 
         self.emit_start_element_initial(target, name, attributes)?;
         self.just_wrote_start_element = true;
@@ -367,11 +365,7 @@ impl Emitter {
                 target,
                 " {}=\"{}\"",
                 attr.name.repr_display(),
-                if self.config.perform_escaping {
-                    escape_str_attribute(attr.value)
-                } else {
-                    Cow::Borrowed(attr.value)
-                }
+                escape_str_attribute(attr.value)
             )?
         }
         Ok(())
@@ -382,15 +376,11 @@ impl Emitter {
         target: &mut W,
         name: Option<Name<'_>>,
     ) -> Result<()> {
-        let owned_name = if self.config.keep_element_names_stack {
-            Some(
-                self.element_names
-                    .pop()
-                    .ok_or(EmitterError::LastElementNameNotAvailable)?,
-            )
-        } else {
-            None
-        };
+        let owned_name = Some(
+            self.element_names
+                .pop()
+                .ok_or(EmitterError::LastElementNameNotAvailable)?,
+        );
 
         // Check that last started element name equals to the provided name, if there are both
         if let Some(ref last_name) = owned_name {
@@ -446,14 +436,7 @@ impl Emitter {
     pub fn emit_characters<W: Write>(&mut self, target: &mut W, content: &str) -> Result<()> {
         self.check_document_started(target)?;
         self.fix_non_empty_element(target)?;
-        target.write_all(
-            (if self.config.perform_escaping {
-                escape_str_pcdata(content)
-            } else {
-                Cow::Borrowed(content)
-            })
-            .as_bytes(),
-        )?;
+        target.write_all(escape_str_pcdata(content).as_bytes())?;
         self.after_text();
         Ok(())
     }
