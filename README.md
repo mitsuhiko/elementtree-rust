@@ -37,4 +37,4 @@ for child in list.find_all("{tag:myns}item") {
 - [Documentation](https://docs.rs/elementtree/)
 - [Issue Tracker](https://github.com/mitsuhiko/elementtree/issues)
 - [Examples](https://github.com/mitsuhiko/elementtree/tree/master/examples)
-- License: [BSD 3-Clause](https://github.com/mitsuhiko/elementtree/blob/master/LICENSE)
+- License: [MIT](https://github.com/mitsuhiko/elementtree/blob/master/LICENSE)
