@@ -144,12 +144,6 @@ impl Token {
                 | Token::EmptyTagEnd
         )
     }
-
-    /// Returns `true` if this token corresponds to a white space character.
-    #[inline]
-    pub fn is_whitespace(&self) -> bool {
-        matches!(*self, Token::Whitespace(_))
-    }
 }
 
 enum State {

@@ -90,7 +90,7 @@ mod tests {
         // error during read
         struct ErrorReader;
         impl io::Read for ErrorReader {
-            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
                 Err(io::Error::new(io::ErrorKind::Other, "test error"))
             }
         }

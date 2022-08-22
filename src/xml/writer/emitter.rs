@@ -139,11 +139,6 @@ impl Emitter {
         *self.indent_stack.last_mut().unwrap() = WroteIndentation::Markup;
     }
 
-    #[inline]
-    fn reset_state(&mut self) {
-        *self.indent_stack.last_mut().unwrap() = WroteIndentation::Nothing;
-    }
-
     fn write_newline<W: Write>(&mut self, target: &mut W, level: usize) -> Result<()> {
         target.write_all(self.config.line_separator.as_bytes())?;
         for _ in 0..level {
