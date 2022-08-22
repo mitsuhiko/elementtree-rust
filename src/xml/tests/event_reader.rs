@@ -376,6 +376,17 @@ fn issue_replacement_character_entity_reference() {
     );
 }
 
+#[test]
+fn test_fuzzed_doctype() {
+    test(
+        b"\n<!DOCTYPE<e<<o<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        br#"
+        "#,
+        ParserConfig::new(),
+        false,
+    );
+}
+
 // If PRINT_SPEC env variable is set, print the lines
 // to stderr instead of comparing with the output
 // it can be used like this:

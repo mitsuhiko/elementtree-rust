@@ -156,7 +156,7 @@ enum State {
     /// Triggered on '<!D' up to '<!DOCTYPE'
     DoctypeStarted(DoctypeStartedSubstate),
     /// Triggered after DoctypeStarted to handle sub elements
-    DoctypeFinishing(u8),
+    DoctypeFinishing(usize),
     /// Triggered on '<![' up to '<![CDATA'
     CDataStarted(CDataStartedSubstate),
     /// Triggered on '?'
@@ -497,7 +497,7 @@ impl Lexer {
     }
 
     /// State used while awaiting the closing bracket for the <!DOCTYPE tag
-    fn doctype_finishing(&mut self, c: char, d: u8) -> Outcome {
+    fn doctype_finishing(&mut self, c: char, d: usize) -> Outcome {
         match c {
             '<' => self.move_to(State::DoctypeFinishing(d + 1)),
             '>' if d == 1 => self.move_to_with(State::Normal, Token::TagEnd),
