@@ -14,7 +14,7 @@ pub fn main() {
         }
     }
 
-    println!("");
+    println!();
     println!("FIND CHILDREN");
     let ns = "urn:oasis:names:tc:SAML:2.0:assertion";
     let list = root.find((ns, "list")).unwrap();
