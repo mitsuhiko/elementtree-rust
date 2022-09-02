@@ -1,5 +1,3 @@
-extern crate elementtree;
-
 use elementtree::Element;
 
 const XML: &str = include_str!("test.xml");

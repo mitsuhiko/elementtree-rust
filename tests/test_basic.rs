@@ -1,4 +1,3 @@
-extern crate elementtree;
 use elementtree::{Element, QName, WriteOptions, XmlProlog};
 use std::str;
 
