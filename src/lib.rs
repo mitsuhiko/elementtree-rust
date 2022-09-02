@@ -1113,8 +1113,6 @@ impl Element {
 
     /// Look up an attribute by qualified name.
     pub fn get_attr<'a, Q: AsQName<'a>>(&'a self, name: Q) -> Option<&'a str> {
-        dbg!(&self.attributes);
-        dbg!(&name.as_qname());
         self.attributes.get(&name.as_qname()).map(|x| x.as_str())
     }
 
