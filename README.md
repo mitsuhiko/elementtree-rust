@@ -35,6 +35,6 @@ for child in list.find_all("{tag:myns}item") {
 ## License and Links
 
 - [Documentation](https://docs.rs/elementtree/)
-- [Issue Tracker](https://github.com/mitsuhiko/elementtree/issues)
-- [Examples](https://github.com/mitsuhiko/elementtree/tree/master/examples)
-- License: [MIT](https://github.com/mitsuhiko/elementtree/blob/master/LICENSE)
+- [Issue Tracker](https://github.com/mitsuhiko/elementtree-rust/issues)
+- [Examples](https://github.com/mitsuhiko/elementtree-rust/tree/master/examples)
+- License: [MIT](https://github.com/mitsuhiko/elementtree-rust/blob/master/LICENSE)
