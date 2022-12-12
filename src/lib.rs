@@ -1031,6 +1031,22 @@ impl Element {
         }
     }
 
+    /// Removes all children that don't match a predicate.
+    pub fn retain_children<F>(&mut self, f: F)
+    where
+        F: FnMut(&Element) -> bool,
+    {
+        self.children.retain(f);
+    }
+
+    /// Removes all children that don't match a predicate. The predicate is passed a mutable reference to each element.
+    pub fn retain_children_mut<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut Element) -> bool,
+    {
+        self.children.retain_mut(f);
+    }
+
     /// Appends a new child and returns a reference to self.
     pub fn append_child(&mut self, child: Element) -> &mut Element {
         self.children.push(child);
