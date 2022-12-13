@@ -423,3 +423,27 @@ fn test_attr() {
         assert_eq!(child.get_attr("{tag:myns}attr"), None);
     }
 }
+
+#[test]
+fn test_retain() {
+    let mut root = Element::from_reader(
+        r#"<?xml version="1.0"?>
+    <root>
+        <list a="1" b="2" c="3">
+            <item attr="foo1"/>
+            <item attr="foo2"/>
+            <item attr="bar3"/>
+            <item attr="foo4"/>
+            <item attr="bar5"/>
+        </list>
+    </root>
+    "#
+        .as_bytes(),
+    )
+    .unwrap();
+
+    let list = root.find_mut("list").unwrap();
+    list.retain_children(|item| item.get_attr("attr").unwrap().starts_with("foo"));
+
+    assert_eq!(list.children().count(), 3);
+}
