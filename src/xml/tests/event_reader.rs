@@ -10,6 +10,8 @@ use crate::xml::common::Position;
 use crate::xml::name::OwnedName;
 use crate::xml::reader::{EventReader, Outcome, ParserConfig, XmlEvent};
 
+use once_cell::sync::Lazy;
+
 /// Dummy function that opens a file, parses it, and returns a `Result`.
 /// There can be IO errors (from `File::open`) and XML errors (from the parser).
 /// Having `impl From<std::io::Error> for xml::reader::Error` allows the user to
@@ -390,16 +392,14 @@ fn test_fuzzed_doctype() {
 // to stderr instead of comparing with the output
 // it can be used like this:
 // PRINT_SPEC=1 cargo test --test event_reader sample_1_full 2> sample_1_full.txt
-lazy_static::lazy_static! {
-    static ref PRINT: bool = {
-        for (key, value) in env::vars() {
-            if key == "PRINT_SPEC" && value == "1" {
-                return true;
-            }
+static PRINT: Lazy<bool> = Lazy::new(|| {
+    for (key, value) in env::vars() {
+        if key == "PRINT_SPEC" && value == "1" {
+            return true;
         }
-        false
-    };
-}
+    }
+    false
+});
 
 // clones a lot but that's fine
 fn trim_until_bar(s: String) -> String {
