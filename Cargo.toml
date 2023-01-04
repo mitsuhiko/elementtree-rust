@@ -9,7 +9,7 @@ keywords = ["xml", "parse", "elementtree"]
 license = "MIT"
 readme = "README.md"
 edition = "2018"
-rust-version = "1.49.0"
+rust-version = "1.56.0"
 
 [dependencies]
 string_cache = "0.8"
