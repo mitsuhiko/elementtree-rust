@@ -2,6 +2,10 @@
 
 All notable changes to elementtree are documented here.
 
+## 1.2.3
+
+- Added `Element::retain_children`. (#19)
+
 ## 1.2.2
 
 - Removed a leftover `dbg!` macro call. (#16)
