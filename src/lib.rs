@@ -1123,12 +1123,7 @@ impl Element {
         use std::borrow::Borrow;
         let tag = tag.as_qname();
 
-        for child in self.children() {
-            if child.tag() == tag.borrow() {
-                return Some(child);
-            }
-        }
-        None
+        self.children().find(|&child| child.tag() == tag.borrow())
     }
 
     /// Finds the first matching child and returns a mut ref

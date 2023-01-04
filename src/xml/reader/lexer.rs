@@ -313,25 +313,17 @@ impl Lexer {
 
         // Check if we have saved a char or two for ourselves
         while let Some(c) = self.char_queue.pop_front() {
-            match self.read_next_token(c)? {
-                Some(t) => {
-                    self.inside_token = false;
-                    return Ok(Some(t));
-                }
-                None => {} // continue
+            if let Some(t) = self.read_next_token(c)? {
+                self.inside_token = false;
+                return Ok(Some(t));
             }
         }
 
         // TODO: this should handle multiple encodings
         while let Some(c) = util::next_char_from(b)? {
-            match self.read_next_token(c)? {
-                Some(t) => {
-                    self.inside_token = false;
-                    return Ok(Some(t));
-                }
-                None => {
-                    // continue
-                }
+            if let Some(t) = self.read_next_token(c)? {
+                self.inside_token = false;
+                return Ok(Some(t));
             }
         }
 

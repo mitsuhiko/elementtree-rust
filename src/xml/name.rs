@@ -168,7 +168,7 @@ impl OwnedName {
     /// Constructs a borrowed `Name` based on this owned name.
     pub fn borrow(&self) -> Name<'_> {
         Name {
-            local_name: &*self.local_name,
+            local_name: &self.local_name,
             namespace: self.namespace.as_deref(),
             prefix: self.prefix.as_deref(),
         }

@@ -51,7 +51,7 @@ impl OwnedAttribute {
     pub fn borrow(&self) -> Attribute<'_> {
         Attribute {
             name: self.name.borrow(),
-            value: &*self.value,
+            value: &self.value,
         }
     }
 
@@ -68,12 +68,7 @@ impl OwnedAttribute {
 
 impl fmt::Display for OwnedAttribute {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}=\"{}\"",
-            self.name,
-            escape_str_attribute(&*self.value)
-        )
+        write!(f, "{}=\"{}\"", self.name, escape_str_attribute(&self.value))
     }
 }
 
