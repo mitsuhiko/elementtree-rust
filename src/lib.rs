@@ -1040,11 +1040,20 @@ impl Element {
     }
 
     /// Removes all children that don't match a predicate. The predicate is passed a mutable reference to each element.
-    pub fn retain_children_mut<F>(&mut self, f: F)
+    pub fn retain_children_mut<F>(&mut self, mut f: F)
     where
         F: FnMut(&mut Element) -> bool,
     {
-        self.children.retain_mut(f);
+        // TODO: change to retain_mut once MSRV moves up to 1.61
+        let old_children = std::mem::take(&mut self.children);
+        self.children
+            .extend(old_children.into_iter().filter_map(|mut item| {
+                if f(&mut item) {
+                    Some(item)
+                } else {
+                    None
+                }
+            }));
     }
 
     /// Appends a new child and returns a reference to self.
