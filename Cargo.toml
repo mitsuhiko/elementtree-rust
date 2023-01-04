@@ -15,4 +15,4 @@ rust-version = "1.49.0"
 string_cache = "0.8"
 
 [dev-dependencies]
-once_cell = "1.13.1"
+lazy_static = "1.4.0"
