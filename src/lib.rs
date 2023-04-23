@@ -202,6 +202,129 @@ impl<'a> AsQName<'a> for (&'a str, &'a str) {
     }
 }
 
+trait Match {
+    fn is_match(&self, el: &Element) -> bool;
+}
+
+#[derive(Debug)]
+pub struct AttributeFilter<'a> {
+    pub name: QName<'a>,
+    pub value: Option<&'a str>,
+    pub invert: bool
+}
+
+impl<'a> AttributeFilter<'a> {
+    fn new(name: QName<'a>, value: Option<&'a str>, invert: bool) -> Self {
+        AttributeFilter { name, value, invert }
+    }
+}
+
+impl<'a> Match for AttributeFilter<'a> {
+    
+    /// searches attribute of given name in element. Compares its value if passed, otherwise just checks attribute existence
+    fn is_match(&self, el: &Element) -> bool {
+        let r = if let Some(attr_value) = el.get_attr(&self.name) {
+            if let Some(self_value) = self.value {
+                self_value == attr_value
+            } else {
+                true
+            }
+        } else {
+            false
+        };
+
+        r != self.invert // true != true -> false, false != true -> true (inverts left side value if right side is true )
+    }
+}
+
+#[derive(Debug)]
+pub struct Query<'a> {
+    pub name: QName<'a>,
+    pub filter: Option<AttributeFilter<'a>>,
+    pub subquery: Option<Box<Query<'a>>>
+}
+
+impl<'a> Query<'a> {
+    fn new(name: QName<'a>, filter: Option<AttributeFilter<'a>>, child: Option<Query<'a>>) -> Query<'a> {
+        Query{ name, filter, subquery: child.map(Box::new) }
+    }
+
+    pub fn filter<T: Iterator<Item = &'a Element>>(&'a self, iter: T) -> Vec<&'a Element> {
+        let mut result = vec![];
+
+        for el in iter.filter(move |el| self.is_match(el)) {
+            if let Some(child) = &self.subquery {
+                result.extend( child.filter( el.children() ) )
+            } else {
+                result.push(el)
+            }
+        }
+
+        result
+    }
+}
+
+impl<'a> Match for Query<'a> {
+    fn is_match(&self, el: &Element) -> bool {
+        if el.tag() == &self.name {
+            if let Some(filter) = &self.filter {
+                filter.is_match(el)
+            } else {
+                true
+            }
+        } else {
+            false
+        }
+    }
+}
+
+pub trait AsQuery<'a> {
+    fn as_query(&'a self) -> Option<Query<'a>>; //Vec<QueryPart<'a>>;
+}
+
+impl<'a> AsQuery<'a> for &str {
+    fn as_query(&'a self) -> Option<Query<'a>> {//Vec<QueryPart<'a>> {
+        // parses line like <{namespace}>nodename<[<!><{namespace}>attrname<=attrvalue>]>
+        // https://regex101.com/r/7PTlSy/1
+        let re = regex::Regex::new(r"(?:\{(\S*?)\})?([a-zA-Z0-9]+)(?:\[(!)?(?:\{(\S*?)\})?([a-zA-Z0-9]+)=([a-zA-Z0-9]+)\])?").unwrap(); 
+        
+        re.captures_iter(self).collect::<Vec<regex::Captures>>().iter().map(|c| {
+            let node = c.get(2).map_or_else(
+            || QName::from_ns_name(None,""), 
+            |node_name| {
+                println!("{}", node_name.as_str());
+                // println!("{:?}", c.get(0).map(|m| m.as_str()).and_then(|s| if s.is_empty() { None } else { Some(s) }); // retreive node namespace);
+
+                QName::from_ns_name(
+                    c.get(1).map(|m| m.as_str()).and_then(|s| if s.is_empty() { None } else { Some(s) }), // retreive node namespace
+                    node_name.as_str()
+                )
+            });
+            
+            let attr = c.get(5).map(|attr_name| { //attr name
+                println!("{}", attr_name.as_str());
+                AttributeFilter::new(
+                    QName::from_ns_name(
+                        c.get(4).map(|m| m.as_str()).and_then(|s| if s.is_empty() { None } else { Some(s) }), // retreive attribute namespace
+                        attr_name.as_str()
+                    ),
+                    c.get(6).map(|m| m.as_str()),  // attribute value
+                    c.get(3).map_or(false, |_| true) // exclamation mark (invert match)
+                )
+            });
+
+            (node, attr)
+        }).rev().fold(None, |query, (node, attr)| {
+            if query.is_none() {
+                Some(Query::new(node, attr, None))
+            } else {
+                Some(Query::new(node, attr, query))
+            }
+        })
+
+    }
+}
+
 /// A `QName` represents a qualified name.
 ///
 /// A qualified name is a tag or attribute name that has a namespace and a
