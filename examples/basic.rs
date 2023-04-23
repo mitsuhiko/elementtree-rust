@@ -1,4 +1,4 @@
-use elementtree::Element;
+use elementtree::{Element, AsQuery};
 
 const XML: &str = include_str!("test.xml");
 
@@ -19,4 +19,11 @@ pub fn main() {
     for item in list.find_all((ns, "item")) {
         println!("-> {}", item.tag());
     }
+
+    let a = "{urn:oasis:names:tc:SAML:2.0:assertion}list/{urn:oasis:names:tc:SAML:2.0:assertion}item".as_query().unwrap();
+
+    for el in a.filter(root.children()) {
+        println!("---> {}", el.tail());
+    }
+    
 }
