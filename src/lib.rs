@@ -88,6 +88,7 @@
 //! Namespaces need to be registered or the XML generated will be malformed.
 #![allow(clippy::wrong_self_convention)]
 
+use std::borrow::Borrow;
 use std::borrow::Cow;
 use std::cmp::Ord;
 use std::cmp::Ordering;
@@ -206,7 +207,7 @@ trait Match {
     fn is_match(&self, el: &Element) -> bool;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AttributeFilter<'a> {
     pub name: QName<'a>,
     pub value: Option<&'a str>,
@@ -237,24 +238,24 @@ impl<'a> Match for AttributeFilter<'a> {
     }
 }
 
-#[derive(Debug)]
-pub struct Query<'a> {
-    pub name: QName<'a>,
-    pub filter: Option<AttributeFilter<'a>>,
-    pub subquery: Option<Box<Query<'a>>>
+#[derive(Debug, Clone)]
+pub struct QueryRule<'a> {
+    name: QName<'a>,
+    filter: Option<AttributeFilter<'a>>,
+    subquery: Option<Box<QueryRule<'a>>>
 }
 
-impl<'a> Query<'a> {
-    fn new(name: QName<'a>, filter: Option<AttributeFilter<'a>>, child: Option<Query<'a>>) -> Query<'a> {
-        Query{ name, filter, subquery: child.map(Box::new) }
+impl<'a> QueryRule<'a> {
+    fn new(name: QName<'a>, filter: Option<AttributeFilter<'a>>, child: Option<QueryRule<'a>>) -> QueryRule<'a> {
+        QueryRule{ name, filter, subquery: child.map(Box::new) }
     }
 
-    pub fn filter<T: Iterator<Item = &'a Element>>(&'a self, iter: T) -> Vec<&'a Element> {
+    fn fetch_all(&self, el: &'a Element) -> Vec<&'a Element> {
         let mut result = vec![];
 
-        for el in iter.filter(move |el| self.is_match(el)) {
+        for el in el.children().filter(move |el| self.is_match(el)) {
             if let Some(child) = &self.subquery {
-                result.extend( child.filter( el.children() ) )
+                result.extend( child.fetch_all( el ) )
             } else {
                 result.push(el)
             }
@@ -262,9 +263,57 @@ impl<'a> Query<'a> {
 
         result
     }
+
+    fn fetch_all_mut(&self, el: &'a mut Element) -> Vec<&'a mut Element> {
+        let mut result = vec![];
+
+        for el in el.children_mut().filter(move |el| self.is_match(el)) {
+            if let Some(child) = &self.subquery {
+                result.extend( child.fetch_all_mut( el ) )
+            } else {
+                result.push(el)
+            }
+        }
+
+        result
+    }
+
+    fn fetch_one(&self, el: &'a Element) -> Option<&'a Element> {
+        
+        for el in el.children().filter(|el| self.is_match(el)) {
+            if let Some(child) = &self.subquery {
+                if let Some(el) = child.fetch_one(el) {
+                    return Some(el);
+                } else {
+                    continue;
+                }
+            } else {
+                return Some(el);
+            }
+        };
+
+        None
+    
+    }
+
+    fn fetch_one_mut(&self, el: &'a mut Element) -> Option<&'a mut Element > {
+        for el in el.children_mut().filter(|el| self.is_match(el)) {
+            if let Some(child) = &self.subquery {
+                if let Some(el) = child.fetch_one_mut(el) {
+                    return Some(el);
+                } else {
+                    continue;
+                }
+            } else {
+                return Some(el);
+            }
+        };
+
+        None
+    }
 }
 
-impl<'a> Match for Query<'a> {
+impl<'a> Match for QueryRule<'a> {
     fn is_match(&self, el: &Element) -> bool {
         if el.tag() == &self.name {
             if let Some(filter) = &self.filter {
@@ -278,23 +327,20 @@ impl<'a> Match for Query<'a> {
     }
 }
 
-pub trait AsQuery<'a> {
-    fn as_query(&'a self) -> Option<Query<'a>>; //Vec<QueryPart<'a>>;
+pub trait AsQueryRule<'a> {
+    fn as_query_rule(&'a self) -> Option<QueryRule<'a>>; //Vec<QueryPart<'a>>;
 }
 
-impl<'a> AsQuery<'a> for &str {
-    fn as_query(&'a self) -> Option<Query<'a>> {//Vec<QueryPart<'a>> {
-        // parses line like <{namespace}>nodename<[<!><{namespace}>attrname<=attrvalue>]>
-        // https://regex101.com/r/7PTlSy/1
-        let re = regex::Regex::new(r"(?:\{(\S*?)\})?([a-zA-Z0-9]+)(?:\[(!)?(?:\{(\S*?)\})?([a-zA-Z0-9]+)=([a-zA-Z0-9]+)\])?").unwrap(); 
+impl<'a> AsQueryRule<'a> for &str {
+    fn as_query_rule(&'a self) -> Option<QueryRule<'a>> {//Vec<QueryPart<'a>> {
+        // parses line like <{namespace}>nodename<[<!><{namespace}>attrname<=attrvalue>]> ({ns1}NODE[!{ns2}tag=value])
+        // https://regex101.com/r/c4pohT/1
+        let re = regex::Regex::new(r"(?:\{(\S*?)\})?([a-zA-Z0-9]+)(?:\[(!)?(?:\{(\S*?)\})?([a-zA-Z0-9]+)(?:=([a-zA-Z0-9]+))?\])?").unwrap(); 
         
         re.captures_iter(self).collect::<Vec<regex::Captures>>().iter().map(|c| {
             let node = c.get(2).map_or_else(
             || QName::from_ns_name(None,""), 
             |node_name| {
-                println!("{}", node_name.as_str());
-                // println!("{:?}", c.get(0).map(|m| m.as_str()).and_then(|s| if s.is_empty() { None } else { Some(s) }); // retreive node namespace);
-
                 QName::from_ns_name(
                     c.get(1).map(|m| m.as_str()).and_then(|s| if s.is_empty() { None } else { Some(s) }), // retreive node namespace
                     node_name.as_str()
@@ -302,7 +348,6 @@ impl<'a> AsQuery<'a> for &str {
             });
             
             let attr = c.get(5).map(|attr_name| { //attr name
-                println!("{}", attr_name.as_str());
                 AttributeFilter::new(
                     QName::from_ns_name(
                         c.get(4).map(|m| m.as_str()).and_then(|s| if s.is_empty() { None } else { Some(s) }), // retreive attribute namespace
@@ -316,12 +361,60 @@ impl<'a> AsQuery<'a> for &str {
             (node, attr)
         }).rev().fold(None, |query, (node, attr)| {
             if query.is_none() {
-                Some(Query::new(node, attr, None))
+                Some(QueryRule::new(node, attr, None))
             } else {
-                Some(Query::new(node, attr, query))
+                Some(QueryRule::new(node, attr, query))
             }
         })
 
+    }
+}
+
+pub struct Query<'a, T> {
+    element: &'a Element,
+    rule: T
+}
+
+impl<'a, T: AsQueryRule<'a>> Query<'a, T> {
+    pub fn all(&'a self) -> Vec<&'a Element> {
+        if let Some(ref rule) = self.rule.as_query_rule() {
+            rule.fetch_all(self.element)
+        } else {
+            vec![]
+        }
+    }
+
+    pub fn one(&'a self) -> Option<&'a Element> {
+        if let Some(ref rule) = self.rule.as_query_rule() {
+            rule.fetch_one(self.element)
+        } else {
+            None
+        }
+    }
+}
+
+
+pub struct QueryMut<'a, T> {
+    element: &'a mut Element,
+    rule: T
+}
+
+impl<'a, T: AsQueryRule<'a>> QueryMut<'a, T> {
+    
+    pub fn all(&'a mut self) -> Vec<&'a mut Element> {
+        if let Some(ref rule) = self.rule.as_query_rule() {
+            rule.fetch_all_mut(self.element)
+        } else {
+            vec![]
+        }
+    }
+
+    pub fn one(&'a mut self) -> Option<&'a mut Element> {
+        if let Some(ref rule) = self.rule.as_query_rule() {
+            rule.fetch_one_mut(self.element)
+        } else {
+            None
+        }
     }
 }
 
@@ -1253,6 +1346,20 @@ impl Element {
     pub fn find_mut<'a, Q: AsQName<'a>>(&'a mut self, tag: Q) -> Option<&'a mut Element> {
         self.find_all_mut(tag).next()
     }
+
+    pub fn query<'a, Q: AsQueryRule<'a>>(&'a self, rule: Q) -> Query<'a, Q> {
+        Query { 
+            element: self, 
+            rule
+        }
+    }
+
+    // pub fn query_mut<'a, Q: AsQueryRule<'a>>(&'a self, rule: Q) -> QueryMut<'a> {
+    //     QueryMut { 
+    //         element: self, 
+    //         rule: rule.as_query_rule()
+    //     }
+    // }
 
     /// Look up an attribute by qualified name.
     pub fn get_attr<'a, Q: AsQName<'a>>(&'a self, name: Q) -> Option<&'a str> {
