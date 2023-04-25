@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<Registry xmlns:ns1="ns1" xmlns:ns2="ns2">
+    <List name="items">
+        <ns1:Items count="3">
+            <ns1:Item ns2:id="1" tagged="true">Item1</ns1:Item>
+            <ns1:Item ns2:id="2">Item2</ns1:Item>
+            <ns1:Item ns2:id="3" tagged="false">Item3</ns1:Item>
+        </ns1:Items>
+    </List>
+    <List name="entities">
+        <ns1:Items count="2">
+            <ns1:Item ns2:id="4">Item4</ns1:Item>
+            <ns1:Item ns2:id="5" tagged="true">Item5</ns1:Item>
+            <ns1:Item ns2:id="6">Item6</ns1:Item>
+        </ns1:Items>
+    </List>
+</Registry>
