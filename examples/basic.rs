@@ -1,9 +1,9 @@
-use elementtree::{Element, AsQueryRule};
+use elementtree::Element;
 
 const XML: &str = include_str!("test.xml");
 
 pub fn main() {
-    let mut root = Element::from_reader(&mut XML.as_bytes()).unwrap();
+    let root = Element::from_reader(&mut XML.as_bytes()).unwrap();
     println!("Print some stuff");
     for child in root.children() {
         println!("{}", child.tag());
@@ -19,12 +19,4 @@ pub fn main() {
     for item in list.find_all((ns, "item")) {
         println!("-> {}", item.tag());
     }
-
-    
-    println!();
-    println!("QUERY CHILDREN");
-    for el in root.query("{urn:oasis:names:tc:SAML:2.0:assertion}list[{tag:foo}bar=41]/{urn:oasis:names:tc:SAML:2.0:assertion}item").all() {
-        println!("---> {}", el.tail().trim());
-    }
-
 }
