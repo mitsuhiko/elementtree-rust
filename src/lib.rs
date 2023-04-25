@@ -329,8 +329,29 @@ impl<'a> QueryRule<'a> {
 
         None
     }
-}
 
+    fn set_default_namespace(mut self, ns: &'a str) -> Self {
+        if self.name.ns().is_none() {
+            self.name.ns = Some(XmlAtom::<'a>::Borrowed(ns));
+        };
+
+
+        self.subquery = self.subquery.map(|subquery| Box::new(subquery.set_default_namespace(ns)));
+
+        self
+        // if let Some(subquery) = self.subquery {
+        //     self.set_subquery( Some(subquery.set_default_namespace(ns)) )
+        // } else {
+        //     self
+        // }
+
+    }
+
+    fn set_subquery(mut self, subquery: Option<QueryRule<'a>>) -> Self {
+        self.subquery = subquery.map(Box::new);
+        self
+    }
+}
 
 impl<'a> IsMatch for QueryRule<'a> {
     fn is_match(&self, el: &Element) -> bool {
@@ -395,6 +416,34 @@ impl<'a> AsQueryRule<'a> for &str {
     }
 }
 
+
+/// impl for &[(ns, node), (ns, node), ...]
+impl<'a> AsQueryRule<'a> for &'a[(&'a str, &'a str)] {
+    fn as_query_rule(&'a self) -> Option<QueryRule<'a>> {
+        self.iter().map(|(ns, query)| {
+            query.as_query_rule().map(move |rule| rule.set_default_namespace(ns))
+        }).fold(Option::<QueryRule>::None, |acc, item| {
+            if let Some(acc) = acc {
+                Some( acc.set_subquery( item ) )
+            } else {
+                item
+            }
+        })
+    }
+}
+
+/// impl for &(ns, query)
+impl <'a> AsQueryRule<'a> for (&'a str, &'a str) {
+    fn as_query_rule(&'a self) -> Option<QueryRule<'a>> {
+        self.1.as_query_rule().map(|rule| rule.set_default_namespace(self.0))
+    }
+}
+
+impl <'a> AsQueryRule<'a> for QueryRule<'a> {
+    fn as_query_rule(&'a self) -> Option<QueryRule<'a>> {
+        Some(self.clone())
+    }
+}
 
 /// Struct that holds QueryRule and Element to fetch.
 /// 
