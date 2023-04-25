@@ -88,7 +88,6 @@
 //! Namespaces need to be registered or the XML generated will be malformed.
 #![allow(clippy::wrong_self_convention)]
 
-use std::borrow::Borrow;
 use std::borrow::Cow;
 use std::cmp::Ord;
 use std::cmp::Ordering;
@@ -203,26 +202,33 @@ impl<'a> AsQName<'a> for (&'a str, &'a str) {
     }
 }
 
-trait Match {
+
+/// Common trait to check if element matches rules encapsulated with object
+trait IsMatch {
     fn is_match(&self, el: &Element) -> bool;
 }
 
+
+/// Defines some matching rules for xml attributes.
+/// 
+/// Matching element with this object searches attribute of given name in element. 
+/// Compares its value if passed, otherwise just checks attribute existence.
+/// Result value will be inverted if __invert__ is true
 #[derive(Debug, Clone)]
 pub struct AttributeFilter<'a> {
-    pub name: QName<'a>,
-    pub value: Option<&'a str>,
-    pub invert: bool
+    name: QName<'a>,
+    value: Option<&'a str>,
+    invert: bool
 }
 
 impl<'a> AttributeFilter<'a> {
     fn new(name: QName<'a>, value: Option<&'a str>, invert: bool) -> Self {
-        AttributeFilter { name, value, invert }
+        Self { name, value, invert }
     }
 }
 
-impl<'a> Match for AttributeFilter<'a> {
+impl<'a> IsMatch for AttributeFilter<'a> {
     
-    /// searches attribute of given name in element. Compares its value if passed, otherwise just checks attribute existence
     fn is_match(&self, el: &Element) -> bool {
         let r = if let Some(attr_value) = el.get_attr(&self.name) {
             if let Some(self_value) = self.value {
@@ -238,6 +244,12 @@ impl<'a> Match for AttributeFilter<'a> {
     }
 }
 
+
+/// Defines a rule to search elemets recursuvely.
+/// 
+/// __name__ defines node name to search.
+/// __filter__ can be passed to match __AttributeFilter__ in addition
+/// __subquery__ contains nested QueryRule for recursive search
 #[derive(Debug, Clone)]
 pub struct QueryRule<'a> {
     name: QName<'a>,
@@ -250,6 +262,9 @@ impl<'a> QueryRule<'a> {
         QueryRule{ name, filter, subquery: child.map(Box::new) }
     }
 
+    /// Searches for all matching children in given element, returns Vec of its references.
+    /// Note that it will iterate over every children of given element.
+    /// Can be slow on large XML structures and/or deep search queryes.
     fn fetch_all(&self, el: &'a Element) -> Vec<&'a Element> {
         let mut result = vec![];
 
@@ -264,6 +279,7 @@ impl<'a> QueryRule<'a> {
         result
     }
 
+    /// works exactly like .fetch_all, but returns mutable references
     fn fetch_all_mut(&self, el: &'a mut Element) -> Vec<&'a mut Element> {
         let mut result = vec![];
 
@@ -278,6 +294,7 @@ impl<'a> QueryRule<'a> {
         result
     }
 
+    /// Searches for first matching children in given element and returns its reference
     fn fetch_one(&self, el: &'a Element) -> Option<&'a Element> {
         
         for el in el.children().filter(|el| self.is_match(el)) {
@@ -296,6 +313,7 @@ impl<'a> QueryRule<'a> {
     
     }
 
+    /// Mutable variant of .fetch_one
     fn fetch_one_mut(&self, el: &'a mut Element) -> Option<&'a mut Element > {
         for el in el.children_mut().filter(|el| self.is_match(el)) {
             if let Some(child) = &self.subquery {
@@ -313,7 +331,8 @@ impl<'a> QueryRule<'a> {
     }
 }
 
-impl<'a> Match for QueryRule<'a> {
+
+impl<'a> IsMatch for QueryRule<'a> {
     fn is_match(&self, el: &Element) -> bool {
         if el.tag() == &self.name {
             if let Some(filter) = &self.filter {
@@ -327,15 +346,21 @@ impl<'a> Match for QueryRule<'a> {
     }
 }
 
+
+/// Convenience trait to represent object as QueryRule
 pub trait AsQueryRule<'a> {
-    fn as_query_rule(&'a self) -> Option<QueryRule<'a>>; //Vec<QueryPart<'a>>;
+    fn as_query_rule(&'a self) -> Option<QueryRule<'a>>;
+    
+    fn regex() -> regex::Regex {
+        // parses line like <{namespace}>nodename<[<!><{namespace}>attrname<=attrvalue>]> ({ns1}NODE[!{ns2}tag=value])
+        // https://regex101.com/r/c4pohT/1
+        regex::Regex::new(r"(?:\{(\S*?)\})?([a-zA-Z0-9]+)(?:\[(!)?(?:\{(\S*?)\})?([a-zA-Z0-9]+)(?:=([a-zA-Z0-9]+))?\])?").unwrap()
+    }
 }
 
 impl<'a> AsQueryRule<'a> for &str {
-    fn as_query_rule(&'a self) -> Option<QueryRule<'a>> {//Vec<QueryPart<'a>> {
-        // parses line like <{namespace}>nodename<[<!><{namespace}>attrname<=attrvalue>]> ({ns1}NODE[!{ns2}tag=value])
-        // https://regex101.com/r/c4pohT/1
-        let re = regex::Regex::new(r"(?:\{(\S*?)\})?([a-zA-Z0-9]+)(?:\[(!)?(?:\{(\S*?)\})?([a-zA-Z0-9]+)(?:=([a-zA-Z0-9]+))?\])?").unwrap(); 
+    fn as_query_rule(&'a self) -> Option<QueryRule<'a>> {
+        let re = Self::regex();
         
         re.captures_iter(self).collect::<Vec<regex::Captures>>().iter().map(|c| {
             let node = c.get(2).map_or_else(
@@ -370,12 +395,17 @@ impl<'a> AsQueryRule<'a> for &str {
     }
 }
 
+
+/// Struct that holds QueryRule and Element to fetch.
+/// 
+/// Implements handy methods to execute rule on element.
 pub struct Query<'a, T> {
     element: &'a Element,
     rule: T
 }
 
 impl<'a, T: AsQueryRule<'a>> Query<'a, T> {
+
     pub fn all(&'a self) -> Vec<&'a Element> {
         if let Some(ref rule) = self.rule.as_query_rule() {
             rule.fetch_all(self.element)
@@ -394,6 +424,7 @@ impl<'a, T: AsQueryRule<'a>> Query<'a, T> {
 }
 
 
+/// Query, but for mutable results
 pub struct QueryMut<'a, T> {
     element: &'a mut Element,
     rule: T
@@ -1347,6 +1378,7 @@ impl Element {
         self.find_all_mut(tag).next()
     }
 
+    /// Returns object for deep search children of element
     pub fn query<'a, Q: AsQueryRule<'a>>(&'a self, rule: Q) -> Query<'a, Q> {
         Query { 
             element: self, 
@@ -1354,12 +1386,13 @@ impl Element {
         }
     }
 
-    // pub fn query_mut<'a, Q: AsQueryRule<'a>>(&'a self, rule: Q) -> QueryMut<'a> {
-    //     QueryMut { 
-    //         element: self, 
-    //         rule: rule.as_query_rule()
-    //     }
-    // }
+    /// Returns object for deep search children of element with mutable results
+    pub fn query_mut<'a, Q: AsQueryRule<'a>>(&'a mut self, rule: Q) -> QueryMut<'a, Q> {
+        QueryMut { 
+            element: self, 
+            rule
+        }
+    }
 
     /// Look up an attribute by qualified name.
     pub fn get_attr<'a, Q: AsQName<'a>>(&'a self, name: Q) -> Option<&'a str> {
