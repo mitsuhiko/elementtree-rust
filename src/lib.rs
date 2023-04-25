@@ -106,6 +106,9 @@ use string_cache::DefaultAtom as Atom;
 
 mod xml;
 
+#[cfg(test)]
+mod tests;
+
 use crate::xml::attribute::{Attribute, OwnedAttribute};
 use crate::xml::common::Position as XmlPosition;
 use crate::xml::common::XmlVersion;
