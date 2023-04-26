@@ -205,33 +205,34 @@ impl<'a> AsQName<'a> for (&'a str, &'a str) {
     }
 }
 
-
 /// Common trait to check if element matches rules encapsulated with object
 trait IsMatch {
     fn is_match(&self, el: &Element) -> bool;
 }
 
-
 /// Defines some matching rules for xml attributes.
-/// 
-/// Matching element with this object searches attribute of given name in element. 
+///
+/// Matching element with this object searches attribute of given name in element.
 /// Compares its value if passed, otherwise just checks attribute existence.
 /// Result value will be inverted if __invert__ is true
 #[derive(Debug, Clone)]
 pub struct AttributeFilter<'a> {
     name: QName<'a>,
     value: Option<&'a str>,
-    invert: bool
+    invert: bool,
 }
 
 impl<'a> AttributeFilter<'a> {
     fn new(name: QName<'a>, value: Option<&'a str>, invert: bool) -> Self {
-        Self { name, value, invert }
+        Self {
+            name,
+            value,
+            invert,
+        }
     }
 }
 
 impl<'a> IsMatch for AttributeFilter<'a> {
-    
     fn is_match(&self, el: &Element) -> bool {
         let r = if let Some(attr_value) = el.get_attr(&self.name) {
             if let Some(self_value) = self.value {
@@ -247,9 +248,8 @@ impl<'a> IsMatch for AttributeFilter<'a> {
     }
 }
 
-
 /// Defines a rule to search elemets recursuvely.
-/// 
+///
 /// __name__ defines node name to search.
 /// __filter__ can be passed to match __AttributeFilter__ in addition
 /// __subquery__ contains nested QueryRule for recursive search
@@ -257,12 +257,20 @@ impl<'a> IsMatch for AttributeFilter<'a> {
 pub struct QueryRule<'a> {
     name: QName<'a>,
     filter: Option<AttributeFilter<'a>>,
-    subquery: Option<Box<QueryRule<'a>>>
+    subquery: Option<Box<QueryRule<'a>>>,
 }
 
 impl<'a> QueryRule<'a> {
-    fn new(name: QName<'a>, filter: Option<AttributeFilter<'a>>, child: Option<QueryRule<'a>>) -> QueryRule<'a> {
-        QueryRule{ name, filter, subquery: child.map(Box::new) }
+    fn new(
+        name: QName<'a>,
+        filter: Option<AttributeFilter<'a>>,
+        child: Option<QueryRule<'a>>,
+    ) -> QueryRule<'a> {
+        QueryRule {
+            name,
+            filter,
+            subquery: child.map(Box::new),
+        }
     }
 
     /// Searches for all matching children in given element, returns Vec of its references.
@@ -273,7 +281,7 @@ impl<'a> QueryRule<'a> {
 
         for el in el.children().filter(move |el| self.is_match(el)) {
             if let Some(child) = &self.subquery {
-                result.extend( child.fetch_all( el ) )
+                result.extend(child.fetch_all(el))
             } else {
                 result.push(el)
             }
@@ -288,7 +296,7 @@ impl<'a> QueryRule<'a> {
 
         for el in el.children_mut().filter(move |el| self.is_match(el)) {
             if let Some(child) = &self.subquery {
-                result.extend( child.fetch_all_mut( el ) )
+                result.extend(child.fetch_all_mut(el))
             } else {
                 result.push(el)
             }
@@ -299,7 +307,6 @@ impl<'a> QueryRule<'a> {
 
     /// Searches for first matching children in given element and returns its reference
     fn fetch_one(&self, el: &'a Element) -> Option<&'a Element> {
-        
         for el in el.children().filter(|el| self.is_match(el)) {
             if let Some(child) = &self.subquery {
                 if let Some(el) = child.fetch_one(el) {
@@ -310,14 +317,13 @@ impl<'a> QueryRule<'a> {
             } else {
                 return Some(el);
             }
-        };
+        }
 
         None
-    
     }
 
     /// Mutable variant of .fetch_one
-    fn fetch_one_mut(&self, el: &'a mut Element) -> Option<&'a mut Element > {
+    fn fetch_one_mut(&self, el: &'a mut Element) -> Option<&'a mut Element> {
         for el in el.children_mut().filter(|el| self.is_match(el)) {
             if let Some(child) = &self.subquery {
                 if let Some(el) = child.fetch_one_mut(el) {
@@ -328,7 +334,7 @@ impl<'a> QueryRule<'a> {
             } else {
                 return Some(el);
             }
-        };
+        }
 
         None
     }
@@ -342,7 +348,9 @@ impl<'a> QueryRule<'a> {
             }
         };
 
-        self.subquery = self.subquery.map(|subquery| Box::new(subquery.set_default_namespace(ns)));
+        self.subquery = self
+            .subquery
+            .map(|subquery| Box::new(subquery.set_default_namespace(ns)));
 
         self
     }
@@ -367,11 +375,10 @@ impl<'a> IsMatch for QueryRule<'a> {
     }
 }
 
-
 /// Convenience trait to represent object as QueryRule
 pub trait AsQueryRule<'a> {
     fn as_query_rule(&'a self) -> Option<QueryRule<'a>>;
-    
+
     fn regex() -> regex::Regex {
         // parses line like <{namespace}>nodename<[<!><{namespace}>attrname<=attrvalue>]> ({ns1}NODE[!{ns2}tag=value])
         // https://regex101.com/r/c4pohT/1
@@ -382,79 +389,102 @@ pub trait AsQueryRule<'a> {
 impl<'a> AsQueryRule<'a> for &str {
     fn as_query_rule(&'a self) -> Option<QueryRule<'a>> {
         let re = Self::regex();
-        
-        re.captures_iter(self).collect::<Vec<regex::Captures>>().iter().map(|c| {
-            let node = c.get(2).map_or_else(
-            || QName::from_ns_name(None,""), 
-            |node_name| {
-                QName::from_ns_name(
-                    c.get(1).map(|m| m.as_str()).and_then(|s| if s.is_empty() { None } else { Some(s) }), // retreive node namespace
-                    node_name.as_str()
-                )
-            });
-            
-            let attr = c.get(5).map(|attr_name| { //attr name
-                AttributeFilter::new(
-                    QName::from_ns_name(
-                        c.get(4).map(|m| m.as_str()).and_then(|s| if s.is_empty() { None } else { Some(s) }), // retreive attribute namespace
-                        attr_name.as_str()
-                    ),
-                    c.get(6).map(|m| m.as_str()),  // attribute value
-                    c.get(3).map_or(false, |_| true) // exclamation mark (invert match)
-                )
-            });
 
-            (node, attr)
-        }).rev().fold(None, |query, (node, attr)| {
-            if query.is_none() {
-                Some(QueryRule::new(node, attr, None))
-            } else {
-                Some(QueryRule::new(node, attr, query))
-            }
-        })
+        re.captures_iter(self)
+            .collect::<Vec<regex::Captures>>()
+            .iter()
+            .map(|c| {
+                let node = c.get(2).map_or_else(
+                    || QName::from_ns_name(None, ""),
+                    |node_name| {
+                        QName::from_ns_name(
+                            c.get(1).map(|m| m.as_str()).and_then(|s| {
+                                if s.is_empty() {
+                                    None
+                                } else {
+                                    Some(s)
+                                }
+                            }), // retreive node namespace
+                            node_name.as_str(),
+                        )
+                    },
+                );
 
+                let attr = c.get(5).map(|attr_name| {
+                    //attr name
+                    AttributeFilter::new(
+                        QName::from_ns_name(
+                            c.get(4).map(|m| m.as_str()).and_then(|s| {
+                                if s.is_empty() {
+                                    None
+                                } else {
+                                    Some(s)
+                                }
+                            }), // retreive attribute namespace
+                            attr_name.as_str(),
+                        ),
+                        c.get(6).map(|m| m.as_str()), // attribute value
+                        c.get(3).map_or(false, |_| true), // exclamation mark (invert match)
+                    )
+                });
+
+                (node, attr)
+            })
+            .rev()
+            .fold(None, |query, (node, attr)| {
+                if query.is_none() {
+                    Some(QueryRule::new(node, attr, None))
+                } else {
+                    Some(QueryRule::new(node, attr, query))
+                }
+            })
     }
 }
 
-
 /// impl for &[(ns, node), (ns, node), ...]
-impl<'a> AsQueryRule<'a> for &'a[(&'a str, &'a str)] {
+impl<'a> AsQueryRule<'a> for &'a [(&'a str, &'a str)] {
     fn as_query_rule(&'a self) -> Option<QueryRule<'a>> {
-        self.iter().map(|(ns, query)| {
-            query.as_query_rule().map(move |rule| rule.set_default_namespace(ns))
-        }).rev().fold(Option::<QueryRule>::None, |acc, item| {
-            if let Some(item) = item {
-                Some(item.set_subquery(acc))
-            } else {
-                acc
-            }
-        })
+        self.iter()
+            .map(|(ns, query)| {
+                query
+                    .as_query_rule()
+                    .map(move |rule| rule.set_default_namespace(ns))
+            })
+            .rev()
+            .fold(Option::<QueryRule>::None, |acc, item| {
+                if let Some(item) = item {
+                    Some(item.set_subquery(acc))
+                } else {
+                    acc
+                }
+            })
     }
 }
 
 /// impl for &(ns, query)
-impl <'a> AsQueryRule<'a> for (&'a str, &'a str) {
+impl<'a> AsQueryRule<'a> for (&'a str, &'a str) {
     fn as_query_rule(&'a self) -> Option<QueryRule<'a>> {
-        self.1.as_query_rule().map(|rule| rule.set_default_namespace(self.0))
+        self.1
+            .as_query_rule()
+            .map(|rule| rule.set_default_namespace(self.0))
     }
 }
 
-impl <'a> AsQueryRule<'a> for QueryRule<'a> {
+impl<'a> AsQueryRule<'a> for QueryRule<'a> {
     fn as_query_rule(&'a self) -> Option<QueryRule<'a>> {
         Some(self.clone())
     }
 }
 
 /// Struct that holds QueryRule and Element to fetch.
-/// 
+///
 /// Implements handy methods to execute rule on element.
 pub struct Query<'a, T> {
     element: &'a Element,
-    rule: T
+    rule: T,
 }
 
 impl<'a, T: AsQueryRule<'a>> Query<'a, T> {
-
     pub fn all(&'a self) -> Vec<&'a Element> {
         if let Some(ref rule) = self.rule.as_query_rule() {
             rule.fetch_all(self.element)
@@ -472,15 +502,13 @@ impl<'a, T: AsQueryRule<'a>> Query<'a, T> {
     }
 }
 
-
 /// Query, but for mutable results
 pub struct QueryMut<'a, T> {
     element: &'a mut Element,
-    rule: T
+    rule: T,
 }
 
 impl<'a, T: AsQueryRule<'a>> QueryMut<'a, T> {
-    
     pub fn all(&'a mut self) -> Vec<&'a mut Element> {
         if let Some(ref rule) = self.rule.as_query_rule() {
             rule.fetch_all_mut(self.element)
@@ -1429,17 +1457,17 @@ impl Element {
 
     /// Returns object for deep search children of element
     pub fn query<'a, Q: AsQueryRule<'a>>(&'a self, rule: Q) -> Query<'a, Q> {
-        Query { 
-            element: self, 
-            rule
+        Query {
+            element: self,
+            rule,
         }
     }
 
     /// Returns object for deep search children of element with mutable results
     pub fn query_mut<'a, Q: AsQueryRule<'a>>(&'a mut self, rule: Q) -> QueryMut<'a, Q> {
-        QueryMut { 
-            element: self, 
-            rule
+        QueryMut {
+            element: self,
+            rule,
         }
     }
 

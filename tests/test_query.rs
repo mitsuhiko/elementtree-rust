@@ -54,7 +54,14 @@ fn test_no_deep_str() {
     let extinfo_query = xml.query("EXTINFO");
     // let extinfo = xml.query("EXTINFO");
 
-    assert_eq!(extinfo_query.one().expect("no extinfo").get_attr("reservation").expect("no attr"), "1");
+    assert_eq!(
+        extinfo_query
+            .one()
+            .expect("no extinfo")
+            .get_attr("reservation")
+            .expect("no attr"),
+        "1"
+    );
 }
 
 #[test]
@@ -62,8 +69,15 @@ fn test_no_deep_mut_str() {
     let mut xml = Element::from_reader(XML.as_bytes()).unwrap();
 
     let mut extinfo_query = xml.query_mut("EXTINFO");
-    
-    assert_eq!(extinfo_query.one().unwrap().get_attr("reservation").expect("no attr"), "1");
+
+    assert_eq!(
+        extinfo_query
+            .one()
+            .unwrap()
+            .get_attr("reservation")
+            .expect("no attr"),
+        "1"
+    );
 }
 
 #[test]
@@ -71,8 +85,15 @@ fn test_deep_two_str() {
     let xml = Element::from_reader(XML.as_bytes()).unwrap();
 
     let interfaces_query = xml.query("EXTINFO/INTERFACES");
-    
-    assert_eq!(interfaces_query.one().unwrap().get_attr("current").expect("no attr"), "1000411");
+
+    assert_eq!(
+        interfaces_query
+            .one()
+            .unwrap()
+            .get_attr("current")
+            .expect("no attr"),
+        "1000411"
+    );
 }
 
 #[test]
@@ -80,8 +101,15 @@ fn test_deep_two_mut_str() {
     let mut xml = Element::from_reader(XML.as_bytes()).unwrap();
 
     let mut interfaces_query = xml.query_mut("EXTINFO/INTERFACES");
-    
-    assert_eq!(interfaces_query.one().unwrap().get_attr("current").expect("no attr"), "1000411");
+
+    assert_eq!(
+        interfaces_query
+            .one()
+            .unwrap()
+            .get_attr("current")
+            .expect("no attr"),
+        "1000411"
+    );
 }
 
 #[test]
@@ -89,8 +117,15 @@ fn test_find_attr() {
     let xml = Element::from_reader(XML.as_bytes()).unwrap();
 
     let interfaces_query = xml.query("CHECKDATA/CHECKLINES/LINE[parent]");
-    
-    assert_eq!(interfaces_query.one().unwrap().get_attr("code").expect("no attr"), "101");
+
+    assert_eq!(
+        interfaces_query
+            .one()
+            .unwrap()
+            .get_attr("code")
+            .expect("no attr"),
+        "101"
+    );
 }
 
 #[test]
@@ -98,8 +133,15 @@ fn test_find_not_attr() {
     let xml = Element::from_reader(XML.as_bytes()).unwrap();
 
     let interfaces_query = xml.query("CHECKDATA/CHECKLINES/LINE[!parent]");
-    
-    assert_eq!(interfaces_query.one().unwrap().get_attr("code").expect("no attr"), "100");
+
+    assert_eq!(
+        interfaces_query
+            .one()
+            .unwrap()
+            .get_attr("code")
+            .expect("no attr"),
+        "100"
+    );
 }
 
 #[test]
@@ -107,7 +149,7 @@ fn test_find_namespace() {
     let xml = Element::from_reader(XML.as_bytes()).unwrap();
 
     let interfaces_query = xml.query("CHECKDATA/{ns1}CURRENCIES/{ns1}CURRENCY");
-    
+
     assert_eq!(interfaces_query.all().len(), 2);
 }
 
@@ -116,8 +158,15 @@ fn test_find_namespace_and_tag() {
     let xml = Element::from_reader(XML.as_bytes()).unwrap();
 
     let interfaces_query = xml.query("CHECKDATA/{ns1}CURRENCIES/{ns1}CURRENCY[name=VISA]");
-    
-    assert_eq!(interfaces_query.one().expect("No element").get_attr("id").expect("no attr"), "{D7D5E50D-7246-4A71-939F-9B37AA300ACF}");
+
+    assert_eq!(
+        interfaces_query
+            .one()
+            .expect("No element")
+            .get_attr("id")
+            .expect("no attr"),
+        "{D7D5E50D-7246-4A71-939F-9B37AA300ACF}"
+    );
 }
 
 #[test]
@@ -125,6 +174,13 @@ fn test_find_namespace_and_not_tag() {
     let xml = Element::from_reader(XML.as_bytes()).unwrap();
 
     let interfaces_query = xml.query("CHECKDATA/{ns1}CURRENCIES/{ns1}CURRENCY[!name=VISA]");
-    
-    assert_eq!(interfaces_query.one().expect("No element").get_attr("id").expect("no attr"), "{9CA200F8-5961-4A6F-AE22-A095C65D1485}");
+
+    assert_eq!(
+        interfaces_query
+            .one()
+            .expect("No element")
+            .get_attr("id")
+            .expect("no attr"),
+        "{9CA200F8-5961-4A6F-AE22-A095C65D1485}"
+    );
 }
