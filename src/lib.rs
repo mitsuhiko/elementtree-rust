@@ -275,7 +275,7 @@ impl<'a> QueryRule<'a> {
 
     /// Searches for all matching children in given element, returns Vec of its references.
     /// Note that it will iterate over every children of given element.
-    /// Can be slow on large XML structures and/or deep search queryes.
+    /// Can be slow on large XML structures and/or deep search queries.
     fn fetch_all(&self, el: &'a Element) -> Vec<&'a Element> {
         let mut result = vec![];
 
