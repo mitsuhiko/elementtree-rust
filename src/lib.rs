@@ -1456,6 +1456,26 @@ impl Element {
     }
 
     /// Returns object for deep search children of element
+    /// 
+    /// pass &str rules with this format:\
+    /// `{ns}NodeName[!attr=value]`\
+    /// "{ns}" is optional. Defines namespace for NodeName\
+    /// "NodeName" Node to search\
+    /// [!attr=value] is optional. It adds attribute filter.\
+    /// "attr" - attribute name\
+    /// "value" - attribute value\
+    /// If you don't pass attribute value, it will just check attribute existance\
+    /// "!" - inverts attribute filter result. In this example works like "attr NOT EQUAL value"\
+    /// 
+    /// Several rules can be chained with "/" symbol
+    /// `{ns}NodeName[!attr=value]/{ns}ChildNode[attr]/...`
+    /// 
+    /// Also you can run query with default namespace by passing tuple as rule:\
+    /// `("default:namespace", "Node/Childnode/Childnode/...")`\
+    /// Note that in this case namespace will be applied for nodes but not for attribute filters\
+    /// 
+    /// For complex queries you can also pass tuple slice as rule\
+    /// [("ns1", "Node"), ("ns2", "Childnode"), ...].as_slice()
     pub fn query<'a, Q: AsQueryRule<'a>>(&'a self, rule: Q) -> Query<'a, Q> {
         Query {
             element: self,
